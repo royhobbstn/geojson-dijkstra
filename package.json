@@ -1,0 +1,29 @@
+{
+  "name": "faster-dijkstra",
+  "version": "0.0.1",
+  "description": "faster, feature rich dijkstra for real world applications",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/royhobbstn/faster-dijkstra.git"
+  },
+  "keywords": [
+    "dijkstra",
+    "network",
+    "graph",
+    "shortest",
+    "path"
+  ],
+  "author": "Daniel Trone",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/royhobbstn/faster-dijkstra/issues"
+  },
+  "homepage": "https://github.com/royhobbstn/faster-dijkstra#readme",
+  "dependencies": {
+    "@tyriar/fibonacci-heap": "^2.0.9"
+  }
+}
