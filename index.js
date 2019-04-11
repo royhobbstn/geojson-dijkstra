@@ -1,14 +1,20 @@
 //
 const FibonacciHeap = require('@tyriar/fibonacci-heap').FibonacciHeap;
 
-exports.runDijkstra = runDijkstra;
-exports.toGraph = toGraph;
-exports.cleanseNetwork = cleanseNetwork;
+exports.Graph = Graph;
 
-function runDijkstra(graph, start, end) {
+function Graph() {
+  this.adjacency_list = {};
+  this.geometry = {};
+  this.properties = {};
+  this.paths = {};
+  this.lookup = {};
+}
 
-  start = graph.lookup[start];
-  end = graph.lookup[end];
+Graph.prototype.runDijkstra = function(start, end) {
+
+  start = this.lookup[start];
+  end = this.lookup[end];
 
   if (!start || !end) {
     throw new Error('origin or destination does not exist on graph');
@@ -37,7 +43,7 @@ function runDijkstra(graph, start, end) {
   dist[current] = 0;
 
   do {
-    graph.adjacency_list[current]
+    this.adjacency_list[current]
       .forEach(n => {
         const node = n.end;
 
@@ -49,7 +55,7 @@ function runDijkstra(graph, start, end) {
         const segment_distance = n.cost;
         const proposed_distance = dist[current] + segment_distance;
 
-        if (proposed_distance < getComparator(dist[node])) {
+        if (proposed_distance < this._getComparator(dist[node])) {
           if (dist[node] !== undefined) {
             heap.decreaseKey(key_to_nodes[node], proposed_distance);
           }
@@ -78,27 +84,26 @@ function runDijkstra(graph, start, end) {
     }
   } while (current);
 
-  const route = reconstructRoute(end, prev, graph);
+  return this._reconstructRoute(end, prev);
 
-  return route;
-}
+};
 
 
-function reconstructRoute(end, prev, graph) {
+Graph.prototype._reconstructRoute = function(end, prev) {
 
   const features = [];
   const segments = [];
   let distance = 0;
 
   while (prev[end]) {
-    const lookup_index = graph.paths[`${end}|${prev[end]}`].lookup_index;
-    const properties = graph.properties[lookup_index];
+    const lookup_index = this.paths[`${end}|${prev[end]}`].lookup_index;
+    const properties = this.properties[lookup_index];
     const feature = {
       "type": "Feature",
       "properties": properties,
       "geometry": {
         "type": "LineString",
-        "coordinates": graph.geometry[lookup_index]
+        "coordinates": this.geometry[lookup_index]
       }
     };
     features.push(feature);
@@ -114,20 +119,19 @@ function reconstructRoute(end, prev, graph) {
 
   return { route, distance, segments };
 
-}
+};
 
 
-function toGraph(geo) {
-  const features = Array.isArray(geo) ? geo : geo.features;
+Graph.prototype.loadFromGeoJson = function(geo) {
+  const f = Array.isArray(geo) ? geo : geo.features;
 
-  // map to one unique edge.  edge can reference geometry with a reverse flag
-  const adjacency_list = {};
-  const geometry = [];
-  const properties = [];
-  const paths = {};
+  // make a copy
+  const copy = JSON.parse(JSON.stringify(f));
+
+  // cleans geojson (mutates in place)
+  const features = this._cleanseGeoJsonNetwork(copy);
 
   let incrementor = 0;
-  const lookup = {};
 
   features.forEach((feature, index) => {
     const coordinates = feature.geometry.coordinates;
@@ -137,32 +141,32 @@ function toGraph(geo) {
       return;
     }
 
-    geometry[index] = coordinates;
-    properties[index] = feature.properties;
+    this.geometry[index] = coordinates;
+    this.properties[index] = feature.properties;
 
     const start_vertex = coordinates[0].join(',');
     const end_vertex = coordinates[coordinates.length - 1].join(',');
 
     let start_id;
 
-    if (!lookup[start_vertex]) {
+    if (!this.lookup[start_vertex]) {
       incrementor++;
-      lookup[start_vertex] = incrementor;
+      this.lookup[start_vertex] = incrementor;
       start_id = incrementor;
     }
     else {
-      start_id = lookup[start_vertex];
+      start_id = this.lookup[start_vertex];
     }
 
     let end_id;
 
-    if (!lookup[end_vertex]) {
+    if (!this.lookup[end_vertex]) {
       incrementor++;
-      lookup[end_vertex] = incrementor;
+      this.lookup[end_vertex] = incrementor;
       end_id = incrementor;
     }
     else {
-      end_id = lookup[end_vertex];
+      end_id = this.lookup[end_vertex];
     }
 
     // forward path
@@ -178,20 +182,20 @@ function toGraph(geo) {
         reverse_flag: false
       };
 
-      const proposed_path = paths[`${start_id}|${end_id}`];
+      const proposed_path = this.paths[`${start_id}|${end_id}`];
       if (!proposed_path) {
         // guard against identical longer edge
-        paths[`${start_id}|${end_id}`] = edge_obj;
+        this.paths[`${start_id}|${end_id}`] = edge_obj;
       }
       else if (forward_cost < proposed_path.cost) {
-        paths[`${start_id}|${end_id}`] = edge_obj;
+        this.paths[`${start_id}|${end_id}`] = edge_obj;
       }
 
-      if (!adjacency_list[start_id]) {
-        adjacency_list[start_id] = [edge_obj];
+      if (!this.adjacency_list[start_id]) {
+        this.adjacency_list[start_id] = [edge_obj];
       }
       else {
-        adjacency_list[start_id].push(edge_obj);
+        this.adjacency_list[start_id].push(edge_obj);
       }
 
     }
@@ -209,32 +213,30 @@ function toGraph(geo) {
         reverse_flag: true
       };
 
-      const proposed_path = paths[`${end_id}|${start_id}`];
+      const proposed_path = this.paths[`${end_id}|${start_id}`];
       if (!proposed_path) {
         // guard against identical longer edge
-        paths[`${end_id}|${start_id}`] = edge_obj_reverse;
+        this.paths[`${end_id}|${start_id}`] = edge_obj_reverse;
       }
       else if (reverse_cost < proposed_path.cost) {
-        paths[`${end_id}|${start_id}`] = edge_obj_reverse;
+        this.paths[`${end_id}|${start_id}`] = edge_obj_reverse;
       }
 
-      if (!adjacency_list[end_id]) {
-        adjacency_list[end_id] = [edge_obj_reverse];
+      if (!this.adjacency_list[end_id]) {
+        this.adjacency_list[end_id] = [edge_obj_reverse];
       }
       else {
-        adjacency_list[end_id].push(edge_obj_reverse);
+        this.adjacency_list[end_id].push(edge_obj_reverse);
       }
 
     }
 
-
   });
 
-  return { adjacency_list, properties, geometry, lookup, paths };
-}
+};
 
 
-function getComparator(dist_node) {
+Graph.prototype._getComparator = function(dist_node) {
   // excessive check necessary to distinguish undefined from 0
   // (dist[node] can on rare circumstances be 'start')
   if (dist_node === 0) {
@@ -245,17 +247,15 @@ function getComparator(dist_node) {
   }
 
   return dist_node;
-}
+};
 
 
-function cleanseNetwork(geo) {
-
-  // make a copy
-  const geojson = JSON.parse(JSON.stringify(geo));
+Graph.prototype._cleanseGeoJsonNetwork = function(features) {
 
   // get rid of duplicate edges (same origin to dest)
   const inventory = {};
-  geojson.features.forEach(feature => {
+
+  features.forEach(feature => {
     const start = feature.geometry.coordinates[0].join(',');
     const end = feature.geometry.coordinates[feature.geometry.coordinates.length - 1].join(',');
     const id = `${start}|${end}`;
@@ -311,11 +311,9 @@ function cleanseNetwork(geo) {
 
   });
 
-
   // filter out marked items
-  geojson.features = geojson.features.filter(feature => {
+  return features.filter(feature => {
     return !feature.properties.__markDelete;
   });
 
-  return geojson;
-}
+};

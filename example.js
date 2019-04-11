@@ -1,19 +1,20 @@
 const fs = require('fs').promises;
-const { cleanseNetwork, toGraph, runDijkstra } = require('./index.js');
+const { Graph } = require('./index.js');
 
 main();
 
 async function main() {
 
   const geojson = await readyNetwork();
-  const scrubbed_network = cleanseNetwork(geojson);
-  const network = toGraph(scrubbed_network);
+
+  const network = new Graph();
+  network.loadFromGeoJson(geojson);
 
   const start = '-118.277145,34.021101';
   const end = '-118.332832,34.035054';
 
   console.time('runningTime');
-  const { distance, segments, route } = runDijkstra(network, start, end);
+  const { distance, segments, route } = network.runDijkstra(start, end);
   console.timeEnd('runningTime');
 
   console.log({ distance });
