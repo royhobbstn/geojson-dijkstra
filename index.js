@@ -11,6 +11,82 @@ function Graph() {
   this.lookup = {};
 }
 
+
+Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected) {
+
+  let start_node_index = undefined;
+  let end_node_index = undefined;
+  let lookup_index = Object.keys(this.properties).length;
+
+  // number of nodes in lookup
+  let node_index = Object.keys(this.lookup).length;
+
+  // check to see if startNode is in lookup
+  if (!this.lookup[startNode]) {
+    // if not, add it
+    this.lookup[startNode] = String(node_index);
+    start_node_index = String(node_index);
+    node_index++;
+  }
+  else {
+    start_node_index = this.lookup[startNode];
+  }
+
+  // check to see if endNode is in lookup
+  if (!this.lookup[endNode]) {
+    // if not, add it
+    this.lookup[endNode] = String(node_index);
+    end_node_index = String(node_index);
+  }
+  else {
+    end_node_index = this.lookup[endNode];
+  }
+
+  // create object to push into adjacency list
+  const obj = {
+    start: String(start_node_index),
+    end: String(end_node_index),
+    cost: attributes._cost,
+    lookup_index: String(lookup_index),
+    reverse_flag: false
+  };
+
+  // add edge to adjacency list; check to see if start node exists;
+  if (this.adjacency_list[start_node_index]) {
+    this.adjacency_list[start_node_index].push(obj);
+  }
+  else {
+    this.adjacency_list[start_node_index] = [obj];
+  }
+
+  this.properties[lookup_index] = attributes;
+  this.paths[`${start_node_index}|${end_node_index}`] = obj;
+
+  // add reverse path
+  if (isUndirected) {
+
+    const reverse_obj = {
+      start: String(end_node_index),
+      end: String(start_node_index),
+      cost: attributes._cost,
+      lookup_index: String(lookup_index),
+      reverse_flag: true
+    };
+
+    if (this.adjacency_list[end_node_index]) {
+      this.adjacency_list[end_node_index].push(reverse_obj);
+    }
+    else {
+      this.adjacency_list[end_node_index] = [reverse_obj];
+    }
+
+    this.paths[`${end_node_index}|${start_node_index}`] = reverse_obj;
+  }
+
+};
+
+
+
 Graph.prototype.runDijkstra = function(start, end) {
 
   start = this.lookup[start];
@@ -96,7 +172,9 @@ Graph.prototype._reconstructRoute = function(end, prev) {
   let distance = 0;
 
   while (prev[end]) {
-    const lookup_index = this.paths[`${end}|${prev[end]}`].lookup_index;
+    // const lookup_index = this.paths[`${end}|${prev[end]}`].lookup_index;
+
+    const lookup_index = this.paths[`${prev[end]}|${end}`].lookup_index;
     const properties = this.properties[lookup_index];
     const feature = {
       "type": "Feature",
@@ -108,7 +186,7 @@ Graph.prototype._reconstructRoute = function(end, prev) {
     };
     features.push(feature);
     distance += properties._cost;
-    segments.push(properties.ID);
+    segments.push(properties._id);
     end = prev[end];
   }
 
