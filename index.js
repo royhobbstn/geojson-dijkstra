@@ -312,8 +312,6 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
 };
 
 
-
-// Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
 Graph.prototype.loadFromGeoJson = function(geo) {
 
   // using loadFromGeoJson enables geojson output
@@ -326,8 +324,6 @@ Graph.prototype.loadFromGeoJson = function(geo) {
 
   // cleans geojson (mutates in place)
   const features = this._cleanseGeoJsonNetwork(copy);
-
-  const len = features.length;
 
   features.forEach((feature, index) => {
     const coordinates = feature.geometry.coordinates;
@@ -358,126 +354,6 @@ Graph.prototype.loadFromGeoJson = function(geo) {
       const backward_cost = feature.properties._backward_cost || feature.properties._cost;
       const properties = Object.assign({}, feature.properties, { _cost: backward_cost, _geometry: feature.geometry.coordinates, _reverse_flag: true });
       this.addEdge(end_vertex, start_vertex, properties, false);
-    }
-
-  });
-
-};
-
-
-Graph.prototype.loadFromGeoJsonOld = function(geo) {
-
-  // using loadFromGeoJson enables geojson output
-  this.isGeoJson = true;
-
-  const f = Array.isArray(geo) ? geo : geo.features;
-
-  // make a copy
-  const copy = JSON.parse(JSON.stringify(f));
-
-  // cleans geojson (mutates in place)
-  const features = this._cleanseGeoJsonNetwork(copy);
-
-  let incrementor = 0;
-
-  features.forEach((feature, index) => {
-    const coordinates = feature.geometry.coordinates;
-
-    if (!feature.properties || !coordinates || !feature.properties._cost) {
-      console.log('invalid feature detected.  skipping...');
-      return;
-    }
-
-    this.geometry[index] = coordinates;
-    this.properties[index] = feature.properties;
-
-    const start_vertex = coordinates[0].join(',');
-    const end_vertex = coordinates[coordinates.length - 1].join(',');
-
-    let start_id;
-
-    if (!this.lookup[start_vertex]) {
-      incrementor++;
-      this.lookup[start_vertex] = incrementor;
-      this.reverse_lookup[incrementor] = start_vertex;
-      start_id = incrementor;
-    }
-    else {
-      start_id = this.lookup[start_vertex];
-    }
-
-    let end_id;
-
-    if (!this.lookup[end_vertex]) {
-      incrementor++;
-      this.lookup[end_vertex] = incrementor;
-      this.reverse_lookup[incrementor] = end_vertex;
-      end_id = incrementor;
-    }
-    else {
-      end_id = this.lookup[end_vertex];
-    }
-
-    // forward path
-    if (feature.properties._direction === 'f' || feature.properties._direction === 'all' || !feature.properties._direction) {
-
-      const forward_cost = feature.properties._forward_cost || feature.properties._cost;
-
-      const edge_obj = {
-        start: start_id,
-        end: end_id,
-        cost: forward_cost,
-        lookup_index: index,
-        reverse_flag: false
-      };
-
-      const proposed_path = this.paths[`${start_id}|${end_id}`];
-      if (!proposed_path) {
-        // guard against identical longer edge
-        this.paths[`${start_id}|${end_id}`] = edge_obj;
-      }
-      else if (forward_cost < proposed_path.cost) {
-        this.paths[`${start_id}|${end_id}`] = edge_obj;
-      }
-
-      if (!this.adjacency_list[start_id]) {
-        this.adjacency_list[start_id] = [edge_obj];
-      }
-      else {
-        this.adjacency_list[start_id].push(edge_obj);
-      }
-
-    }
-
-    // reverse path
-    if (feature.properties._direction === 'b' || feature.properties._direction === 'all' || !feature.properties._direction) {
-
-      const reverse_cost = feature.properties._backward_cost || feature.properties._cost;
-
-      const edge_obj_reverse = {
-        start: end_id,
-        end: start_id,
-        cost: reverse_cost,
-        lookup_index: index,
-        reverse_flag: true
-      };
-
-      const proposed_path = this.paths[`${end_id}|${start_id}`];
-      if (!proposed_path) {
-        // guard against identical longer edge
-        this.paths[`${end_id}|${start_id}`] = edge_obj_reverse;
-      }
-      else if (reverse_cost < proposed_path.cost) {
-        this.paths[`${end_id}|${start_id}`] = edge_obj_reverse;
-      }
-
-      if (!this.adjacency_list[end_id]) {
-        this.adjacency_list[end_id] = [edge_obj_reverse];
-      }
-      else {
-        this.adjacency_list[end_id].push(edge_obj_reverse);
-      }
-
     }
 
   });
