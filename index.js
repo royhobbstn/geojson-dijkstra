@@ -4,20 +4,28 @@ const cloneGeoJson = require('@turf/clone').default;
 
 exports.Graph = Graph;
 
-function Graph() {
+function Graph(options) {
+
   this.adjacency_list = {};
   this.geometry = {};
   this.properties = {};
   this.paths = {};
   this.isGeoJson = true;
   this.placement_index = 0;
+  this.mutate_inputs = false;
+
+  if (options && options.allowMutateInputs === true) {
+    this.mutate_inputs = true;
+  }
+
+
 }
 
 
-Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected) {
+Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
 
   // copying attributes slows things down significantly
-  // hopefully it wont be needed
+  const attributes = !this.mutate_inputs ? JSON.parse(JSON.stringify(attrs)) : attrs;
 
   // any feature without _geometry disables geojson output
   if (!attributes._geometry) {
@@ -281,9 +289,8 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
 Graph.prototype.loadFromGeoJson = function(geo) {
 
   // turf clone is faster than JSON.parse(JSON.stringify(x))
-  // still regretable vs just mutating - should address this in the future 
-  // with explicit documentation and options
-  const copy = cloneGeoJson(geo).features;
+  // still regretable vs mutating - avoid if possible
+  const copy = !this.mutate_inputs ? cloneGeoJson(geo).features : geo.features;
 
   // using loadFromGeoJson enables geojson output
   this.isGeoJson = true;

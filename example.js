@@ -6,7 +6,7 @@ main();
 async function main() {
 
   const geojson = await readyNetwork();
-  const network = new Graph();
+  const network = new Graph({ allowMutateInputs: true });
 
   console.time('buildTime');
   network.loadFromGeoJson(geojson);
