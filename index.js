@@ -4,6 +4,11 @@ const cloneGeoJson = require('@turf/clone').default;
 
 exports.Graph = Graph;
 
+// output function helpers
+exports.buildGeoJsonPath = buildGeoJsonPath;
+exports.buildEdgeIdList = buildEdgeIdList;
+exports.buildNodeList = buildNodeList;
+
 function Graph(options) {
 
   this.adjacency_list = {};
@@ -22,7 +27,7 @@ function Graph(options) {
 // fully serializable
 // however its possible that it would be quicker to re-build your network
 // since a network representation will typically take up more disk
-// space than a geojson represenation of your network
+// space than a geojson representation of your network
 Graph.prototype.save = function(options) {
   return {
     adjacency_list: this.adjacency_list,
@@ -109,84 +114,10 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
 };
 
 
+Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
-Graph.prototype.runDijkstra = function(start, end, options) {
-
-  let outputs = {
-    path: true,
-    nodelist: true,
-    edgelist: true,
-    distance: true
-  };
-
-  // ['path', 'nodelist', 'edgelist', 'distance'];
-
-  // by default, will produce:
-  // path: a geojson feature collection of linestrings
-  // nodelist: an ordered array of nodes that trace the path
-  // edgelist: an ordered array of edge ids (the `_id` attribute of each edge)
-  // distance: the numerical accumulated `_cost` of the path
-
-  // if the options object is sent with an `output` property, it will override
-  // the above defaults
-  if (options && options.output && Array.isArray(options.output)) {
-
-    outputs = {
-      path: false,
-      nodelist: false,
-      edgelist: false,
-      distance: false
-    };
-
-    options.output.forEach(o => {
-      outputs[o] = true;
-    });
-
-  }
-
-  // all nodes are converted to strings internally, so if its a number
-  // find out now so that it can be converted back later.
-  // will support string, number, and array (as array of 2 lat/lng number coordinates only)
-  // only comes into play if you need to return a nodelist
-  let node_type = undefined;
-
-  if (outputs.nodelist) {
-    node_type = typeof start;
-    if (node_type === 'object' && Array.isArray(start)) {
-      node_type = 'array';
-    }
-    else if (node_type !== 'string' && node_type !== 'number') {
-      throw new Error('invalid object input.  takes only numbers, strings, and coordinate arrays');
-    }
-  }
-
-  start = String(start);
-  end = String(end);
-
-
-  // note that if any input edges were missing a _geometry property
-  // you will not be able to output a geojson path, and the option will be
-  // excluded by default
-
-  if (!this.isGeoJson) {
-    outputs.path = false;
-  }
-
-  if (!start || !end) {
-    throw new Error('origin or destination does not exist on graph');
-  }
-
-  // quick exit for start === end
-  if (start === end) {
-    return {
-      distance: 0,
-      segments: [],
-      route: {
-        type: 'FeatureCollection',
-        features: []
-      }
-    };
-  }
+  const str_start = String(start);
+  const str_end = String(end);
 
   const heap = new FibonacciHeap();
   const key_to_nodes = {};
@@ -195,18 +126,25 @@ Graph.prototype.runDijkstra = function(start, end, options) {
   const prev = {}; // node to parent_node lookup
   const visited = {}; // node has been fully explored
 
-  let current = start;
+  let current = str_start;
   dist[current] = 0;
 
-  do {
+  // quick exit for start === end
+  if (str_start === str_end) {
+    current = '';
+  }
+
+  while (current) {
     this.adjacency_list[current]
       .forEach(n => {
         const node = n.end;
 
-        // this optimization may not hold true for directed graphs
+        // todo this optimization may not hold true for directed graphs
         if (visited[node]) {
           return;
         }
+
+        // todo plug something in here that takes (dist, prev, visited, etc)
 
         const segment_distance = n.cost;
         const proposed_distance = dist[current] + segment_distance;
@@ -235,122 +173,149 @@ Graph.prototype.runDijkstra = function(start, end, options) {
     }
 
     // exit early if current node becomes end node
-    if (current === end) {
+    if (current === str_end) {
       current = '';
     }
-  } while (current);
+  }
 
-  return this._reconstructRoute(end, prev, outputs, node_type);
+  // total cost included by default
+  let response = { total_cost: dist[str_end] };
 
+  // one callback function
+  if (!Array.isArray(parseOutputFns)) {
+    return Object.assign({}, response, parseOutputFns(this, start, end, prev, dist, visited));
+  }
+
+  // array of callback functions
+  parseOutputFns.forEach(fn => {
+    response = Object.assign({}, response, fn(this, start, end, prev, dist, visited));
+  });
+
+  return response;
 };
 
+function buildGeoJsonPath(graph, start, end, prev, dist, visited) {
 
-Graph.prototype._reconstructRoute = function(end, prev, outputs, node_type) {
+  let str_end = String(end);
 
-  let features = [];
-  let edgelist = [];
-  let nodelist = [];
-  let distance = 0;
-  let path = {
+  const features = [];
+
+  const path = {
     type: 'FeatureCollection',
     features: features
   };
 
-  if (outputs.nodelist) {
-    // prefill first node in nodelist
-    if (node_type === 'string') {
-      nodelist.push(end);
-    }
-    else if (node_type === 'number') {
-      nodelist.push(Number(end));
-    }
-    else if (node_type === 'array') {
-      nodelist.push(end.split(',').map(d => Number(d)));
-    }
+  // note that if any input edges were missing a _geometry property
+  // you will not be able to output a geojson path, and the option will be
+  // excluded by default
+  if (!graph.isGeoJson) {
+    return path;
   }
 
-  while (prev[end]) {
+  while (prev[str_end]) {
+    const lookup = graph.paths[`${prev[str_end]}|${str_end}`];
+    const properties = graph.properties[lookup.lookup_index];
 
-    const lookup = this.paths[`${prev[end]}|${end}`];
-    const properties = this.properties[lookup.lookup_index];
-
-    if (outputs.path) {
-      const feature = {
-        "type": "Feature",
-        "properties": properties,
-        "geometry": {
-          "type": "LineString",
-          "coordinates": this.geometry[lookup.lookup_index]
-        }
-      };
-      features.push(feature);
-    }
-
-    if (outputs.distance) {
-      distance += properties._cost;
-    }
-
-    if (outputs.edgelist) {
-      edgelist.push(properties._id);
-    }
-
-    if (outputs.nodelist) {
-      if (lookup.reverse_flag) {
-        if (node_type === 'string') {
-          nodelist.push(lookup.end);
-        }
-        else if (node_type === 'number') {
-          nodelist.push(Number(lookup.end));
-        }
-        else if (node_type === 'array') {
-          nodelist.push(lookup.end.split(',').map(d => Number(d)));
-        }
+    const feature = {
+      "type": "Feature",
+      "properties": properties,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": graph.geometry[lookup.lookup_index]
       }
-      else {
-        if (node_type === 'string') {
-          nodelist.push(lookup.start);
-        }
-        else if (node_type === 'number') {
-          nodelist.push(Number(lookup.start));
-        }
-        else if (node_type === 'array') {
-          nodelist.push(lookup.start.split(',').map(d => Number(d)));
-        }
+    };
+    features.push(feature);
+
+    str_end = prev[str_end];
+  }
+
+  path.features.reverse();
+
+  return { geojsonPath: path };
+
+}
+
+function buildEdgeIdList(graph, start, end, prev, dist, visited) {
+
+  let str_end = String(end);
+
+  let edgelist = [];
+
+  while (prev[str_end]) {
+    const lookup = graph.paths[`${prev[str_end]}|${str_end}`];
+    const properties = graph.properties[lookup.lookup_index];
+    edgelist.push(properties._id);
+    str_end = prev[str_end];
+  }
+
+  edgelist.reverse();
+
+  return { edgelist };
+}
+
+function buildNodeList(graph, start, end, prev, dist, visited) {
+
+  let str_end = String(end);
+
+  // all nodes are converted to strings internally, so if its a number
+  // find out now so that it can be converted back later.
+  // will support string, number, and array (as array of 2 lat/lng number coordinates only)
+  // only comes into play if you need to return a nodelist
+  let node_type = typeof end;
+  if (node_type === 'object' && Array.isArray(end)) {
+    node_type = 'array';
+  }
+  else if (node_type !== 'string' && node_type !== 'number') {
+    throw new Error('invalid object input.  takes only numbers, strings, and coordinate arrays');
+  }
+
+  let nodelist = [];
+
+  // prefill first node in nodelist
+  if (node_type === 'string') {
+    nodelist.push(str_end);
+  }
+  else if (node_type === 'number') {
+    nodelist.push(Number(str_end));
+  }
+  else if (node_type === 'array') {
+    nodelist.push(str_end.split(',').map(d => Number(d)));
+  }
+
+  while (prev[str_end]) {
+
+    const lookup = graph.paths[`${prev[str_end]}|${str_end}`];
+
+    if (lookup.reverse_flag) {
+      if (node_type === 'string') {
+        nodelist.push(lookup.end);
+      }
+      else if (node_type === 'number') {
+        nodelist.push(Number(lookup.end));
+      }
+      else if (node_type === 'array') {
+        nodelist.push(lookup.end.split(',').map(d => Number(d)));
+      }
+    }
+    else {
+      if (node_type === 'string') {
+        nodelist.push(lookup.start);
+      }
+      else if (node_type === 'number') {
+        nodelist.push(Number(lookup.start));
+      }
+      else if (node_type === 'array') {
+        nodelist.push(lookup.start.split(',').map(d => Number(d)));
       }
     }
 
-    end = prev[end];
+    str_end = prev[str_end];
   }
 
+  nodelist.reverse();
 
-  if (!outputs.path) {
-    path = undefined;
-  }
-  else {
-    path.features.reverse();
-  }
-
-  if (!outputs.distance) {
-    distance = undefined;
-  }
-
-  if (!outputs.edgelist) {
-    edgelist = undefined;
-  }
-  else {
-    edgelist.reverse();
-  }
-
-  if (!outputs.nodelist) {
-    nodelist = undefined;
-  }
-  else {
-    nodelist.reverse();
-  }
-
-  return { path, distance, edgelist, nodelist };
-
-};
+  return { nodelist };
+}
 
 
 Graph.prototype.loadFromGeoJson = function(geo) {
