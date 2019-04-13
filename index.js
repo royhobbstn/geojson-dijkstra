@@ -1,5 +1,6 @@
 //
 const FibonacciHeap = require('@tyriar/fibonacci-heap').FibonacciHeap;
+const cloneGeoJson = require('@turf/clone').default;
 
 exports.Graph = Graph;
 
@@ -314,13 +315,13 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
 
 Graph.prototype.loadFromGeoJson = function(geo) {
 
+  // turf clone is faster than JSON.parse(JSON.stringify(x))
+  // still regretable vs just mutating - should address this in the future 
+  // with explicit documentation and options
+  const copy = cloneGeoJson(geo).features;
+
   // using loadFromGeoJson enables geojson output
   this.isGeoJson = true;
-
-  const f = Array.isArray(geo) ? geo : geo.features;
-
-  // make a copy
-  const copy = JSON.parse(JSON.stringify(f));
 
   // cleans geojson (mutates in place)
   const features = this._cleanseGeoJsonNetwork(copy);
