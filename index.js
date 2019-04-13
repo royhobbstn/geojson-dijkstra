@@ -121,7 +121,27 @@ Graph.prototype.runDijkstra = function(start, end, options) {
 
   }
 
-  // note that if the network was not generated through imported geoJSON,
+  // all nodes are converted to strings internally, so if its a number
+  // find out now so that it can be converted back later.
+  // will support string, number, and array (as array of 2 lat/lng number coordinates only)
+  // only comes into play if you need to return a nodelist
+  let node_type = undefined;
+
+  if (outputs.nodelist) {
+    node_type = typeof start;
+    if (node_type === 'object' && Array.isArray(start)) {
+      node_type = 'array';
+    }
+    else if (node_type !== 'string' && node_type !== 'number') {
+      throw new Error('invalid object input.  takes only numbers, strings, and coordinate arrays');
+    }
+  }
+
+  start = String(start);
+  end = String(end);
+
+
+  // note that if any input edges were missing a _geometry property
   // you will not be able to output a geojson path, and the option will be
   // excluded by default
 
@@ -197,12 +217,12 @@ Graph.prototype.runDijkstra = function(start, end, options) {
     }
   } while (current);
 
-  return this._reconstructRoute(end, prev, outputs);
+  return this._reconstructRoute(end, prev, outputs, node_type);
 
 };
 
 
-Graph.prototype._reconstructRoute = function(end, prev, outputs) {
+Graph.prototype._reconstructRoute = function(end, prev, outputs, node_type) {
 
   let features = [];
   let edgelist = [];
@@ -215,7 +235,15 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
 
   if (outputs.nodelist) {
     // prefill first node in nodelist
-    nodelist.push(end);
+    if (node_type === 'string') {
+      nodelist.push(end);
+    }
+    else if (node_type === 'number') {
+      nodelist.push(Number(end));
+    }
+    else if (node_type === 'array') {
+      nodelist.push(end.split(',').map(d => Number(d)));
+    }
   }
 
   while (prev[end]) {
@@ -245,10 +273,26 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
 
     if (outputs.nodelist) {
       if (lookup.reverse_flag) {
-        nodelist.push(lookup.end);
+        if (node_type === 'string') {
+          nodelist.push(lookup.end);
+        }
+        else if (node_type === 'number') {
+          nodelist.push(Number(lookup.end));
+        }
+        else if (node_type === 'array') {
+          nodelist.push(lookup.end.split(',').map(d => Number(d)));
+        }
       }
       else {
-        nodelist.push(lookup.start);
+        if (node_type === 'string') {
+          nodelist.push(lookup.start);
+        }
+        else if (node_type === 'number') {
+          nodelist.push(Number(lookup.start));
+        }
+        else if (node_type === 'array') {
+          nodelist.push(lookup.start.split(',').map(d => Number(d)));
+        }
       }
     }
 
