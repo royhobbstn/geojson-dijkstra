@@ -10,30 +10,33 @@ function Graph() {
   this.paths = {};
   this.lookup = {};
   this.reverse_lookup = {};
-  this.isGeoJson = false;
+  this.isGeoJson = true;
+  this.placement_index = 0;
+  this.temp_index = 0;
 }
 
 
 Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected) {
 
-  // using manual API disables geojson output
-  this.isGeoJson = false;
+  // copying attributes slows things down significantly
+  // hopefully it wont be needed
+
+  // any feature without _geometry disables geojson output
+  if (!attributes._geometry) {
+    this.isGeoJson = false;
+  }
 
   let start_node_index = undefined;
   let end_node_index = undefined;
-  let lookup_index = Object.keys(this.properties).length;
-
-  // number of nodes in lookup
-  let node_index = Object.keys(this.lookup).length;
 
   // check to see if startNode is in lookup
   if (!this.lookup[startNode]) {
     // if not, add it
-    this.lookup[startNode] = String(node_index);
+    this.lookup[startNode] = String(this.temp_index);
     // and store it in the reverse lookup
-    this.reverse_lookup[node_index] = startNode;
-    start_node_index = String(node_index);
-    node_index++;
+    this.reverse_lookup[this.temp_index] = startNode;
+    start_node_index = String(this.temp_index);
+    this.temp_index++;
   }
   else {
     start_node_index = this.lookup[startNode];
@@ -42,10 +45,11 @@ Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
   // check to see if endNode is in lookup
   if (!this.lookup[endNode]) {
     // if not, add it
-    this.lookup[endNode] = String(node_index);
+    this.lookup[endNode] = String(this.temp_index);
     // and store it in the reverse lookup
-    this.reverse_lookup[node_index] = endNode;
-    end_node_index = String(node_index);
+    this.reverse_lookup[this.temp_index] = endNode;
+    end_node_index = String(this.temp_index);
+    this.temp_index++; // todo is this okay?
   }
   else {
     end_node_index = this.lookup[endNode];
@@ -56,7 +60,7 @@ Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
     start: String(start_node_index),
     end: String(end_node_index),
     cost: attributes._cost,
-    lookup_index: String(lookup_index),
+    lookup_index: String(this.placement_index),
     reverse_flag: false
   };
 
@@ -68,7 +72,12 @@ Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
     this.adjacency_list[start_node_index] = [obj];
   }
 
-  this.properties[lookup_index] = attributes;
+  if (attributes._geometry) {
+    this.geometry[this.placement_index] = attributes._geometry;
+    delete attributes._geometry;
+  }
+
+  this.properties[this.placement_index] = attributes;
   this.paths[`${start_node_index}|${end_node_index}`] = obj;
 
   // add reverse path
@@ -78,7 +87,7 @@ Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
       start: String(end_node_index),
       end: String(start_node_index),
       cost: attributes._cost,
-      lookup_index: String(lookup_index),
+      lookup_index: String(this.placement_index),
       reverse_flag: true
     };
 
@@ -91,6 +100,8 @@ Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
 
     this.paths[`${end_node_index}|${start_node_index}`] = reverse_obj;
   }
+
+  this.placement_index++;
 
 };
 
@@ -301,7 +312,60 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
 };
 
 
+
+// Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
 Graph.prototype.loadFromGeoJson = function(geo) {
+
+  // using loadFromGeoJson enables geojson output
+  this.isGeoJson = true;
+
+  const f = Array.isArray(geo) ? geo : geo.features;
+
+  // make a copy
+  const copy = JSON.parse(JSON.stringify(f));
+
+  // cleans geojson (mutates in place)
+  const features = this._cleanseGeoJsonNetwork(copy);
+
+  const len = features.length;
+
+  features.forEach((feature, index) => {
+    const coordinates = feature.geometry.coordinates;
+
+    if (!feature.properties || !coordinates || !feature.properties._cost) {
+      console.log('invalid feature detected.  skipping...');
+      return;
+    }
+
+    const start_vertex = coordinates[0].join(',');
+    const end_vertex = coordinates[coordinates.length - 1].join(',');
+
+    // undirected
+    if (feature.properties._direction === 'all' || !feature.properties._direction) {
+      const properties = Object.assign({}, feature.properties, { _cost: feature.properties._cost, _geometry: feature.geometry.coordinates });
+      this.addEdge(start_vertex, end_vertex, properties, true);
+    }
+
+    // forward path
+    if (feature.properties._direction === 'f') {
+      const forward_cost = feature.properties._forward_cost || feature.properties._cost;
+      const properties = Object.assign({}, feature.properties, { _cost: forward_cost, _geometry: feature.geometry.coordinates, _reverse_flag: false });
+      this.addEdge(start_vertex, end_vertex, properties, false);
+    }
+
+    // reverse path
+    if (feature.properties._direction === 'b') {
+      const backward_cost = feature.properties._backward_cost || feature.properties._cost;
+      const properties = Object.assign({}, feature.properties, { _cost: backward_cost, _geometry: feature.geometry.coordinates, _reverse_flag: true });
+      this.addEdge(end_vertex, start_vertex, properties, false);
+    }
+
+  });
+
+};
+
+
+Graph.prototype.loadFromGeoJsonOld = function(geo) {
 
   // using loadFromGeoJson enables geojson output
   this.isGeoJson = true;
