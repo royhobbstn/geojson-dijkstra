@@ -10,20 +10,19 @@ async function main() {
   const network = new Graph();
   network.loadFromGeoJson(geojson);
 
-  console.log(JSON.stringify(network))
-
   // const start = '-118.277145,34.021101';
   // const end = '-118.332832,34.035054';
-  const start = '-101.35986328125,43.34116005412307';
+  const start = '-101.35986328125,43.34116005412307'; // todo number??
   const end = '-91.669921875,40.195659093364654';
 
   console.time('runningTime');
-  const { distance, segments, route } = network.runDijkstra(start, end);
+  const { distance, edgelist, nodelist, path } = network.runDijkstra(start, end, { output: ['path', 'nodelist', 'edgelist', 'distance'] });
   console.timeEnd('runningTime');
 
   console.log({ distance });
-  console.log({ segments });
-  console.log({ route });
+  console.log({ edgelist });
+  console.log({ nodelist });
+  console.log({ path });
 
 }
 
