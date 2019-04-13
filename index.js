@@ -17,10 +17,33 @@ function Graph(options) {
   if (options && options.allowMutateInputs === true) {
     this.mutate_inputs = true;
   }
-
-
 }
 
+// fully serializable
+// however its possible that it would be quicker to re-build your network
+// since a network representation will typically take up more disk
+// space than a geojson represenation of your network
+Graph.prototype.save = function(options) {
+  return {
+    adjacency_list: this.adjacency_list,
+    geometry: this.geometry,
+    properties: this.properties,
+    paths: this.paths,
+    isGeoJson: this.isGeoJson,
+    placement_index: this.placement_index,
+    mutate_inputs: this.mutate_inputs,
+  };
+};
+
+Graph.prototype.load = function(parsedGraph) {
+  this.adjacency_list = parsedGraph.adjacency_list;
+  this.geometry = parsedGraph.geometry;
+  this.properties = parsedGraph.properties;
+  this.paths = parsedGraph.paths;
+  this.isGeoJson = parsedGraph.isGeoJson;
+  this.placement_index = parsedGraph.placement_index;
+  this.mutate_inputs = parsedGraph.mutate_inputs;
+};
 
 Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
 

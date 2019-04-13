@@ -12,15 +12,22 @@ async function main() {
   network.loadFromGeoJson(geojson);
   console.timeEnd('buildTime');
 
-  // console.log(network)
+  console.time('saveTime');
+  const geo_parse = network.save();
+  console.timeEnd('saveTime');
+
+  console.time('loadTime');
+  const newNetwork = new Graph();
+  newNetwork.load(geo_parse);
+  console.timeEnd('loadTime');
 
   const start = '-118.277145,34.021101';
   const end = '-118.332832,34.035054';
-  // const start = '-101.35986328125,43.34116005412307'; // todo number??
+  // const start = '-101.35986328125,43.34116005412307';
   // const end = '-91.669921875,40.195659093364654';
 
   console.time('runningTime');
-  const { distance, edgelist, nodelist, path } = network.runDijkstra(start, end, { output: ['path', 'nodelist', 'edgelist', 'distance'] });
+  const { distance, edgelist, nodelist, path } = newNetwork.runDijkstra(start, end, { output: ['path', 'nodelist', 'edgelist', 'distance'] });
   console.timeEnd('runningTime');
 
   console.log({ distance });
