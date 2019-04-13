@@ -9,11 +9,8 @@ function Graph() {
   this.geometry = {};
   this.properties = {};
   this.paths = {};
-  this.lookup = {};
-  this.reverse_lookup = {};
   this.isGeoJson = true;
   this.placement_index = 0;
-  this.temp_index = 0;
 }
 
 
@@ -27,50 +24,24 @@ Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
     this.isGeoJson = false;
   }
 
-  let start_node_index = undefined;
-  let end_node_index = undefined;
-
-  // check to see if startNode is in lookup
-  if (!this.lookup[startNode]) {
-    // if not, add it
-    this.lookup[startNode] = String(this.temp_index);
-    // and store it in the reverse lookup
-    this.reverse_lookup[this.temp_index] = startNode;
-    start_node_index = String(this.temp_index);
-    this.temp_index++;
-  }
-  else {
-    start_node_index = this.lookup[startNode];
-  }
-
-  // check to see if endNode is in lookup
-  if (!this.lookup[endNode]) {
-    // if not, add it
-    this.lookup[endNode] = String(this.temp_index);
-    // and store it in the reverse lookup
-    this.reverse_lookup[this.temp_index] = endNode;
-    end_node_index = String(this.temp_index);
-    this.temp_index++; // todo is this okay?
-  }
-  else {
-    end_node_index = this.lookup[endNode];
-  }
+  const start_node = String(startNode);
+  const end_node = String(endNode);
 
   // create object to push into adjacency list
   const obj = {
-    start: String(start_node_index),
-    end: String(end_node_index),
+    start: start_node,
+    end: end_node,
     cost: attributes._cost,
     lookup_index: String(this.placement_index),
     reverse_flag: false
   };
 
   // add edge to adjacency list; check to see if start node exists;
-  if (this.adjacency_list[start_node_index]) {
-    this.adjacency_list[start_node_index].push(obj);
+  if (this.adjacency_list[start_node]) {
+    this.adjacency_list[start_node].push(obj);
   }
   else {
-    this.adjacency_list[start_node_index] = [obj];
+    this.adjacency_list[start_node] = [obj];
   }
 
   if (attributes._geometry) {
@@ -79,27 +50,27 @@ Graph.prototype.addEdge = function(startNode, endNode, attributes, isUndirected)
   }
 
   this.properties[this.placement_index] = attributes;
-  this.paths[`${start_node_index}|${end_node_index}`] = obj;
+  this.paths[`${start_node}|${end_node}`] = obj;
 
   // add reverse path
   if (isUndirected) {
 
     const reverse_obj = {
-      start: String(end_node_index),
-      end: String(start_node_index),
+      start: String(end_node),
+      end: String(start_node),
       cost: attributes._cost,
       lookup_index: String(this.placement_index),
       reverse_flag: true
     };
 
-    if (this.adjacency_list[end_node_index]) {
-      this.adjacency_list[end_node_index].push(reverse_obj);
+    if (this.adjacency_list[end_node]) {
+      this.adjacency_list[end_node].push(reverse_obj);
     }
     else {
-      this.adjacency_list[end_node_index] = [reverse_obj];
+      this.adjacency_list[end_node] = [reverse_obj];
     }
 
-    this.paths[`${end_node_index}|${start_node_index}`] = reverse_obj;
+    this.paths[`${end_node}|${start_node}`] = reverse_obj;
   }
 
   this.placement_index++;
@@ -149,9 +120,6 @@ Graph.prototype.runDijkstra = function(start, end, options) {
   if (!this.isGeoJson) {
     outputs.path = false;
   }
-
-  start = this.lookup[start];
-  end = this.lookup[end];
 
   if (!start || !end) {
     throw new Error('origin or destination does not exist on graph');
@@ -239,7 +207,7 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
 
   if (outputs.nodelist) {
     // prefill first node in nodelist
-    nodelist.push(this.reverse_lookup[end]);
+    nodelist.push(end);
   }
 
   while (prev[end]) {
@@ -268,14 +236,11 @@ Graph.prototype._reconstructRoute = function(end, prev, outputs) {
     }
 
     if (outputs.nodelist) {
-      const direction = lookup.reverse_flag;
-      const start_node = this.reverse_lookup[lookup.start];
-      const end_node = this.reverse_lookup[lookup.end];
-      if (direction) {
-        nodelist.push(end_node);
+      if (lookup.reverse_flag) {
+        nodelist.push(lookup.end);
       }
       else {
-        nodelist.push(start_node);
+        nodelist.push(lookup.start);
       }
     }
 
