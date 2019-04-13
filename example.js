@@ -1,5 +1,5 @@
 const fs = require('fs').promises;
-const { Graph, buildGeoJsonPath, buildEdgeIdList, buildNodeList } = require('./index.js');
+const { Graph, CoordinateLookup, buildGeoJsonPath, buildEdgeIdList, buildNodeList } = require('./index.js');
 
 main();
 
@@ -23,10 +23,20 @@ async function main() {
   newNetwork.load(geo_parse);
   console.timeEnd('loadTime');
 
+  console.time('createIndex');
+  const lookup = new CoordinateLookup(network);
+  console.timeEnd('createIndex');
+
+  const coords1 = lookup.getClosestNetworkPt(-100, 43);
+  console.log(coords1);
+
+  const coords2 = lookup.getClosestNetworkPt(-91, 40);
+  console.log(coords2);
+
   // const start = '-118.277145,34.021101';
   // const end = '-118.332832,34.035054';
-  const start = [-101.35986328125, 43.34116005412307];
-  const end = [-91.669921875, 40.195659093364654];
+  const start = coords1;
+  const end = coords2;
 
   console.time('runningTime');
   const { total_cost, geojsonPath, edgelist, nodelist } = network.runDijkstra(start, end, [buildGeoJsonPath, buildEdgeIdList, buildNodeList]);

@@ -24,7 +24,9 @@
   },
   "homepage": "https://github.com/royhobbstn/faster-dijkstra#readme",
   "dependencies": {
-    "@turf/clone": "^6.0.2",
-    "@tyriar/fibonacci-heap": "^2.0.9"
+    "@turf/clone": "6.0.2",
+    "@tyriar/fibonacci-heap": "2.0.9",
+    "geokdbush": "1.1.0",
+    "kdbush": "1.0.1"
   }
 }
