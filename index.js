@@ -213,6 +213,11 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
   // total cost included by default
   let response = { total_cost: dist[str_end] };
 
+  // if no output fns specified
+  if (!parseOutputFns) {
+    return response;
+  }
+
   // one callback function
   if (!Array.isArray(parseOutputFns)) {
     return Object.assign({}, response, parseOutputFns(this, start, end, prev, dist, visited));
