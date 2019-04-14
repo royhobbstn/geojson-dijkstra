@@ -27,6 +27,7 @@
     "@turf/clone": "6.0.2",
     "@tyriar/fibonacci-heap": "2.0.9",
     "geokdbush": "1.1.0",
-    "kdbush": "1.0.1"
+    "kdbush": "1.0.1",
+    "present": "^1.0.0"
   }
 }

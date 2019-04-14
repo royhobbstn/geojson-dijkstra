@@ -145,6 +145,13 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
 
 };
 
+function Node(obj) {
+  this.id = obj.id;
+  this.dist = obj.dist !== undefined ? obj.dist : Infinity;
+  this.prev = undefined;
+  this.visited = undefined;
+}
+
 
 Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
@@ -153,13 +160,10 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
   const heap = new FibonacciHeap();
   const key_to_nodes = {};
+  const heap_node_key = {};
 
-  const dist = {}; // distances to each node
-  const prev = {}; // node to parent_node lookup
-  const visited = {}; // node has been fully explored
-
-  let current = str_start;
-  dist[current] = 0;
+  let current = new Node({ id: str_start, dist: 0 });
+  key_to_nodes[str_start] = current;
 
   // quick exit for start === end
   if (str_start === str_end) {
@@ -167,32 +171,38 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
   }
 
   while (current) {
-    this.adjacency_list[current]
-      .forEach(n => {
-        const node = n.end;
 
-        // todo this optimization may not hold true for directed graphs
-        if (visited[node]) {
+    this.adjacency_list[current.id]
+      .forEach(edge => {
+
+        const exploring_node = edge.end;
+
+        let node = key_to_nodes[exploring_node];
+
+        if (node && node.visited === true) {
           return;
         }
 
-        // todo plug something in here that takes (dist, prev, visited, etc)
+        if (node === undefined) {
+          node = new Node({ id: exploring_node });
+          key_to_nodes[exploring_node] = node;
+        }
 
-        const segment_distance = n.cost;
-        const proposed_distance = dist[current] + segment_distance;
+        const proposed_distance = current.dist + edge.cost;
 
-        if (proposed_distance < this._getComparator(dist[node])) {
-          if (dist[node] !== undefined) {
-            heap.decreaseKey(key_to_nodes[node], proposed_distance);
+        if (proposed_distance < node.dist) {
+          if (node.dist !== Infinity) {
+            heap.decreaseKey(heap_node_key[exploring_node], proposed_distance);
           }
           else {
-            key_to_nodes[node] = heap.insert(proposed_distance, node);
+            heap_node_key[exploring_node] = heap.insert(proposed_distance, node);
           }
-          dist[node] = proposed_distance;
-          prev[node] = current;
+          node.dist = proposed_distance;
+          node.prev = current.id;
         }
       });
-    visited[current] = true;
+
+    current.visited = true;
 
     // get lowest value from heap
     const elem = heap.extractMinimum();
@@ -205,28 +215,29 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
     }
 
     // exit early if current node becomes end node
-    if (current === str_end) {
+    if (current.id === str_end) {
       current = '';
     }
   }
 
+
   // total cost included by default
-  let response = { total_cost: dist[str_end] };
+  let response = { total_cost: key_to_nodes[str_end].dist };
 
-  // if no output fns specified
-  if (!parseOutputFns) {
-    return response;
-  }
+  // // if no output fns specified
+  // if (!parseOutputFns) {
+  //   return response;
+  // }
 
-  // one callback function
-  if (!Array.isArray(parseOutputFns)) {
-    return Object.assign({}, response, parseOutputFns(this, start, end, prev, dist, visited));
-  }
+  // // one callback function
+  // if (!Array.isArray(parseOutputFns)) {
+  //   return Object.assign({}, response, parseOutputFns(this, start, end, prev, dist, visited));
+  // }
 
-  // array of callback functions
-  parseOutputFns.forEach(fn => {
-    response = Object.assign({}, response, fn(this, start, end, prev, dist, visited));
-  });
+  // // array of callback functions
+  // parseOutputFns.forEach(fn => {
+  //   response = Object.assign({}, response, fn(this, start, end, prev, dist, visited));
+  // });
 
   return response;
 };
