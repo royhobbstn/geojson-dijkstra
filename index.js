@@ -1,8 +1,8 @@
 //
-const FibonacciHeap = require('@tyriar/fibonacci-heap').FibonacciHeap;
 const cloneGeoJson = require('@turf/clone').default;
 const kdbush = require('kdbush');
 const geokdbush = require('geokdbush');
+const NodeHeap = require('./queue.js');
 
 // objects
 exports.Graph = Graph;
@@ -150,6 +150,8 @@ function Node(obj) {
   this.dist = obj.dist !== undefined ? obj.dist : Infinity;
   this.prev = undefined;
   this.visited = undefined;
+  this.opened = false; // whether has been put in queue
+  this.heapIndex = -1;
 }
 
 
@@ -158,12 +160,20 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
   const str_start = String(start);
   const str_end = String(end);
 
-  const heap = new FibonacciHeap();
-  const key_to_nodes = {};
-  const heap_node_key = {};
+  const nodeState = new Map();
+
+  var openSet = new NodeHeap({
+    compare: function(a, b) {
+      return a.dist - b.dist;
+    },
+    setNodeId: function(nodeSearchState, heapIndex) {
+      nodeSearchState.heapIndex = heapIndex;
+    }
+  });
 
   let current = new Node({ id: str_start, dist: 0 });
-  key_to_nodes[str_start] = current;
+  nodeState.set(str_start, current);
+  current.opened = 1;
 
   // quick exit for start === end
   if (str_start === str_end) {
@@ -176,43 +186,37 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
       .forEach(edge => {
 
         const exploring_node = edge.end;
+        const proposed_distance = current.dist + edge.cost;
 
-        let node = key_to_nodes[exploring_node];
+        let node = nodeState.get(exploring_node);
+        if (node === undefined) {
+          node = new Node({ id: exploring_node });
+          nodeState.set(exploring_node, node);
+        }
 
-        if (node && node.visited === true) {
+        if (node.visited === true) {
           return;
         }
 
-        if (node === undefined) {
-          node = new Node({ id: exploring_node });
-          key_to_nodes[exploring_node] = node;
+        if (!node.opened) {
+          openSet.push(node);
+          node.opened = true;
         }
 
-        const proposed_distance = current.dist + edge.cost;
-
-        if (proposed_distance < node.dist) {
-          if (node.dist !== Infinity) {
-            heap.decreaseKey(heap_node_key[exploring_node], proposed_distance);
-          }
-          else {
-            heap_node_key[exploring_node] = heap.insert(proposed_distance, node);
-          }
-          node.dist = proposed_distance;
-          node.prev = current.id;
+        if (proposed_distance >= node.dist) {
+          // longer path
+          return;
         }
+
+        node.dist = proposed_distance;
+        node.prev = current.id;
+        openSet.updateItem(node.heapIndex);
       });
 
     current.visited = true;
 
     // get lowest value from heap
-    const elem = heap.extractMinimum();
-
-    if (elem) {
-      current = elem.value;
-    }
-    else {
-      current = '';
-    }
+    current = openSet.pop();
 
     // exit early if current node becomes end node
     if (current.id === str_end) {
@@ -222,7 +226,7 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
 
   // total cost included by default
-  let response = { total_cost: key_to_nodes[str_end].dist };
+  let response = { total_cost: nodeState.get(str_end).dist };
 
   // // if no output fns specified
   // if (!parseOutputFns) {
@@ -231,18 +235,18 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
   // // one callback function
   // if (!Array.isArray(parseOutputFns)) {
-  //   return Object.assign({}, response, parseOutputFns(this, start, end, prev, dist, visited));
+  //   return Object.assign({}, response, parseOutputFns(this, start, end, prev, dist));
   // }
 
   // // array of callback functions
   // parseOutputFns.forEach(fn => {
-  //   response = Object.assign({}, response, fn(this, start, end, prev, dist, visited));
+  //   response = Object.assign({}, response, fn(this, start, end, prev, dist));
   // });
 
   return response;
 };
 
-function buildGeoJsonPath(graph, start, end, prev, dist, visited) {
+function buildGeoJsonPath(graph, start, end, prev, dist) {
 
   let str_end = String(end);
 
@@ -283,7 +287,7 @@ function buildGeoJsonPath(graph, start, end, prev, dist, visited) {
 
 }
 
-function buildEdgeIdList(graph, start, end, prev, dist, visited) {
+function buildEdgeIdList(graph, start, end, prev, dist) {
 
   let str_end = String(end);
 
@@ -301,7 +305,7 @@ function buildEdgeIdList(graph, start, end, prev, dist, visited) {
   return { edgelist };
 }
 
-function buildNodeList(graph, start, end, prev, dist, visited) {
+function buildNodeList(graph, start, end, prev, dist) {
 
   let str_end = String(end);
 
