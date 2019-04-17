@@ -21,7 +21,6 @@ function Graph(options) {
   this.isGeoJson = true;
   this.placement_index = 0;
   this.mutate_inputs = false;
-  this.nodeState = new Map();
 
   if (options && options.allowMutateInputs === true) {
     this.mutate_inputs = true;
@@ -96,19 +95,10 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
   const start_node = String(startNode);
   const end_node = String(endNode);
 
-  // create nodes and add to map
-  if (!this.nodeState.has(start_node)) {
-    this.nodeState.set(start_node, new Node({ id: start_node }));
-  }
-  if (!this.nodeState.has(end_node)) {
-    this.nodeState.set(end_node, new Node({ id: end_node }));
-  }
-
-  // create edge object to push into adjacency list
+  // create object to push into adjacency list
   const obj = {
     start: start_node,
     end: end_node,
-    end_node: this.nodeState.get(String(end_node)),
     cost: attributes._cost,
     lookup_index: String(this.placement_index),
     reverse_flag: false
@@ -136,7 +126,6 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
     const reverse_obj = {
       start: String(end_node),
       end: String(start_node),
-      end_node: this.nodeState.get(String(start_node)),
       cost: attributes._cost,
       lookup_index: String(this.placement_index),
       reverse_flag: true
@@ -161,6 +150,7 @@ function Node(obj) {
   this.dist = obj.dist !== undefined ? obj.dist : Infinity;
   this.prev = undefined;
   this.visited = undefined;
+  this.opened = false; // whether has been put in queue
   this.heapIndex = -1;
 }
 
@@ -170,8 +160,9 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
   const str_start = String(start);
   const str_end = String(end);
 
+  const nodeState = new Map();
 
-  let openSet = new NodeHeap({
+  var openSet = new NodeHeap({
     compare: function(a, b) {
       return a.dist - b.dist;
     },
@@ -180,14 +171,9 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
     }
   });
 
-  let opened = {}; // keep track of which nodes have been opened this round
-
-  let current = this.nodeState.get(str_start);
-  current.dist = 0;
-  current.visited = undefined;
-  current.heapIndex = -1;
-  current.prev = undefined;
-  opened[current] = true;
+  let current = new Node({ id: str_start, dist: 0 });
+  nodeState.set(str_start, current);
+  current.opened = 1;
 
   // quick exit for start === end
   if (str_start === str_end) {
@@ -199,24 +185,23 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
     this.adjacency_list[current.id]
       .forEach(edge => {
 
-        const node = edge.end_node;
-        const node_id = edge.end;
+        const exploring_node = edge.end;
+        const proposed_distance = current.dist + edge.cost;
 
-        if (!opened[node_id]) {
-          // reset node values
-          opened[node_id] = true;
-          node.prev = undefined;
-          node.dist = Infinity;
-          node.visited = undefined;
-          node.heapIndex = -1;
-          openSet.push(node);
+        let node = nodeState.get(exploring_node);
+        if (node === undefined) {
+          node = new Node({ id: exploring_node });
+          nodeState.set(exploring_node, node);
         }
 
         if (node.visited === true) {
           return;
         }
 
-        const proposed_distance = current.dist + edge.cost;
+        if (!node.opened) {
+          openSet.push(node);
+          node.opened = true;
+        }
 
         if (proposed_distance >= node.dist) {
           // longer path
@@ -235,16 +220,13 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
     // exit early if current node becomes end node
     if (current.id === str_end) {
-      break;
+      current = '';
     }
   }
 
-  openSet = null;
-  opened = null;
-
 
   // total cost included by default
-  let response = { total_cost: current.dist };
+  let response = { total_cost: nodeState.get(str_end).dist };
 
   // // if no output fns specified
   // if (!parseOutputFns) {
