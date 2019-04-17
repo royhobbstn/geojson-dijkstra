@@ -4,26 +4,47 @@
  * 
  * Adapted for PathFinding needs by @anvaka
  * Copyright (c) 2017, Andrei Kashcha
- * 
- * ReAdapted for PathFinding needs by @royhobbstn
- * Copyright (c) 2019, Daniel Trone
- * 
  */
 module.exports = NodeHeap;
 
-function NodeHeap() {
-  this.keys = [];
-  this.values = [];
-  this.lookup = {};
-  this.length = 0;
+function NodeHeap(data, options) {
+  if (!(this instanceof NodeHeap)) return new NodeHeap(data, options);
+
+  if (!Array.isArray(data)) {
+    // assume first argument is our config object;
+    options = data;
+    data = [];
+  }
+
+  options = options || {};
+
+  this.data = data || [];
+  this.length = this.data.length;
+  this.compare = options.compare || defaultCompare;
+  this.setNodeId = options.setNodeId || noop;
+
+  if (this.length > 0) {
+    for (var i = (this.length >> 1); i >= 0; i--) this._down(i);
+  }
+
+  if (options.setNodeId) {
+    for (var i = 0; i < this.length; ++i) {
+      this.setNodeId(this.data[i], i);
+    }
+  }
+}
+
+function noop() {}
+
+function defaultCompare(a, b) {
+  return a - b;
 }
 
 NodeHeap.prototype = {
 
-  push: function(item, value) {
-    this.keys.push(item);
-    this.values.push(value);
-    this.lookup[item] = this.length; // key to pos lookup
+  push: function(item) {
+    this.data.push(item);
+    this.setNodeId(item, this.length);
     this.length++;
     this._up(this.length - 1);
   },
@@ -31,85 +52,72 @@ NodeHeap.prototype = {
   pop: function() {
     if (this.length === 0) return undefined;
 
-    var top_key = this.keys[0];
-    // var top_value = this.values[0];
+    var top = this.data[0];
     this.length--;
 
     if (this.length > 0) {
-      this.keys[0] = this.keys[this.length];
-      this.values[0] = this.values[this.length];
-      this.lookup[this.keys[0]] = 0;
+      this.data[0] = this.data[this.length];
+      this.setNodeId(this.data[0], 0);
       this._down(0);
     }
-    this.keys.pop();
-    this.values.pop();
+    this.data.pop();
 
-    // delete this.lookup[top_key]; // todo perf??
-    return top_key;
+    return top;
   },
 
-  updateItem: function(key, value) {
+  peek: function() {
+    return this.data[0];
+  },
 
-    const pos = this.lookup[key];
-    this.values[pos] = value;
+  updateItem: function(pos) {
     this._down(pos);
     this._up(pos);
   },
 
   _up: function(pos) {
-    var keys = this.keys;
-    var values = this.values;
-    var lookup = this.lookup
-
-    var item_key = keys[pos];
-    var item_val = values[pos];
+    var data = this.data;
+    var compare = this.compare;
+    var setNodeId = this.setNodeId;
+    var item = data[pos];
 
     while (pos > 0) {
       var parent = (pos - 1) >> 1;
-      var current_key = keys[parent];
-      var current_val = values[parent];
-      if (item_val - current_val >= 0) break;
-      keys[pos] = current_key;
-      values[pos] = current_val;
-      this.lookup[current_key] = pos;
+      var current = data[parent];
+      if (compare(item, current) >= 0) break;
+      data[pos] = current;
+
+      setNodeId(current, pos);
       pos = parent;
     }
 
-    keys[pos] = item_key;
-    values[pos] = item_val;
-    this.lookup[item_key] = pos;
+    data[pos] = item;
+    setNodeId(item, pos);
   },
 
   _down: function(pos) {
-    var keys = this.keys;
-    var values = this.values;
-    var lookup = this.lookup;
-
+    var data = this.data;
+    var compare = this.compare;
     var halfLength = this.length >> 1;
-    var item_key = keys[pos];
-    var item_val = values[pos];
+    var item = data[pos];
+    var setNodeId = this.setNodeId;
 
     while (pos < halfLength) {
       var left = (pos << 1) + 1;
       var right = left + 1;
-      var best_key = keys[left];
-      var best_val = values[left];
+      var best = data[left];
 
-      if (right < this.length && (values[right] - best_val) < 0) {
+      if (right < this.length && compare(data[right], best) < 0) {
         left = right;
-        best_key = keys[right];
-        best_val = values[right];
+        best = data[right];
       }
-      if ((best_val - item_val) >= 0) break;
+      if (compare(best, item) >= 0) break;
 
-      keys[pos] = best_key;
-      values[pos] = best_val;
-      lookup[best_key] = pos;
+      data[pos] = best;
+      setNodeId(best, pos);
       pos = left;
     }
 
-    keys[pos] = item_key;
-    values[pos] = item_val;
-    lookup[item_key] = pos;
+    data[pos] = item;
+    setNodeId(item, pos);
   }
 };

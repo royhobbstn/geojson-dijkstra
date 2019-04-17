@@ -160,7 +160,9 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
   const str_start = String(start);
   const str_end = String(end);
 
-  var nodeHeap = new NodeHeap({
+  const nodeState = new Map();
+
+  var openSet = new NodeHeap({
     compare: function(a, b) {
       return a.dist - b.dist;
     },
@@ -169,15 +171,9 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
     }
   });
 
-  const dist = {}; // distances to each node
-  const prev = {}; // node to parent_node lookup
-  const visited = {}; // node has been fully explored
-  const opened = {};
-  const heapIndex = {};
-
-  let current = str_start;
-  dist[current] = 0;
-  opened[current] = true;
+  let current = new Node({ id: str_start, dist: 0 });
+  nodeState.set(str_start, current);
+  current.opened = 1;
 
   // quick exit for start === end
   if (str_start === str_end) {
@@ -186,47 +182,51 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
   while (current) {
 
-    this.adjacency_list[current]
+    this.adjacency_list[current.id]
       .forEach(edge => {
 
         const exploring_node = edge.end;
-        const proposed_distance = dist[current] + edge.cost;
+        const proposed_distance = current.dist + edge.cost;
 
-        if (visited[exploring_node] === true) {
+        let node = nodeState.get(exploring_node);
+        if (node === undefined) {
+          node = new Node({ id: exploring_node });
+          nodeState.set(exploring_node, node);
+        }
+
+        if (node.visited === true) {
           return;
         }
 
-        if (!opened[exploring_node]) {
-          dist[exploring_node] = Infinity;
-          opened[exploring_node] = true;
-          heapIndex[exploring_node] = -1;
-          nodeHeap.push(exploring_node, Infinity);
+        if (!node.opened) {
+          openSet.push(node);
+          node.opened = true;
         }
 
-        if (proposed_distance >= dist[exploring_node]) {
+        if (proposed_distance >= node.dist) {
+          // longer path
           return;
         }
 
-        dist[exploring_node] = proposed_distance;
-        prev[exploring_node] = current;
-
-        nodeHeap.updateItem(exploring_node, proposed_distance);
+        node.dist = proposed_distance;
+        node.prev = current.id;
+        openSet.updateItem(node.heapIndex);
       });
 
     current.visited = true;
 
     // get lowest value from heap
-    current = nodeHeap.pop();
+    current = openSet.pop();
 
     // exit early if current node becomes end node
-    if (current === str_end) {
+    if (current.id === str_end) {
       current = '';
     }
   }
 
 
   // total cost included by default
-  let response = { total_cost: dist[str_end] };
+  let response = { total_cost: nodeState.get(str_end).dist };
 
   // // if no output fns specified
   // if (!parseOutputFns) {
