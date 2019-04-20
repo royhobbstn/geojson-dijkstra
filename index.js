@@ -237,14 +237,7 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
   const nodeState = new Map();
 
-  var openSet = new NodeHeap({
-    compare: function(a, b) {
-      return a.score - b.score;
-    },
-    setNodeId: function(nodeSearchState, heapIndex) {
-      nodeSearchState.heapIndex = heapIndex;
-    }
-  });
+  var openSet = new NodeHeap();
 
   // let current = new Node({ id: str_start, dist: 0 });
   let current = this.pool.createNewState({ id: str_start, dist: 0, start_lat, start_lng, end_lat, end_lng });

@@ -4,40 +4,28 @@
  * 
  * Adapted for PathFinding needs by @anvaka
  * Copyright (c) 2017, Andrei Kashcha
- */
+ *
+ * Additional inconsequential changes by @royhobbstn
+ * 
+ **/
+
 module.exports = NodeHeap;
 
 function NodeHeap(data, options) {
-  if (!(this instanceof NodeHeap)) return new NodeHeap(data, options);
-
-  if (!Array.isArray(data)) {
-    // assume first argument is our config object;
-    options = data;
-    data = [];
-  }
 
   options = options || {};
 
-  this.data = data || [];
-  this.length = this.data.length;
-  this.compare = options.compare || defaultCompare;
-  this.setNodeId = options.setNodeId || noop;
+  this.data = [];
+  this.length = 0;
 
-  if (this.length > 0) {
-    for (var i = (this.length >> 1); i >= 0; i--) this._down(i);
-  }
+  this.compare = (a, b) => {
+    return a.score - b.score;
+  };
 
-  if (options.setNodeId) {
-    for (var i = 0; i < this.length; ++i) {
-      this.setNodeId(this.data[i], i);
-    }
-  }
-}
+  this.setNodeId = (nodeSearchState, heapIndex) => {
+    nodeSearchState.heapIndex = heapIndex;
+  };
 
-function noop() {}
-
-function defaultCompare(a, b) {
-  return a - b;
 }
 
 NodeHeap.prototype = {
