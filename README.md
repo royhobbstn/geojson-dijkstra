@@ -10,37 +10,46 @@ npm install geojson-dijkstra --save
 ```
 
 ```
-const { Graph, buildEdgeIdList, buildGeoJsonPath } = require('geojson-dijkstra');
-
-const graph = new Graph();
+const { Graph, CoordinateLookup, buildEdgeIdList, buildGeoJsonPath } = require('geojson-dijkstra');
 
 main();
 
 async function main() {
 
+  // load your geoJson file
   const geojson_raw = await fs.readFile('./full_network.geojson');
   const geojson = JSON.parse(geojson_raw);
 
-  // set up _cost and _id field
+  // add a _cost field (to signify the weight of an edge)
+  // add an _id field (to uniquely identify each edge)
   geojson.features.forEach(feat => {
     feat.properties._cost = feat.properties.MILES;
     feat.properties._id = feat.properties.ID;
   });
 
+  // create a new object which will hold the network graph
+  const graph = new Graph();
+  // load geojson into your network
   graph.loadFromGeoJson(geojson);
   
+  // initialize a coordinate lookup service (optional)
+  // if you don't use the lookup service, you'll have to make sure that
+  // your start and end points correspond exactly to line segment 
+  // endpoints in your geoJson file (down to the last decimal)
   const lookup = new CoordinateLookup();
   
+  // use the lookup to find the closest network nodes to your input coordinates
   const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
   const endOfPath = lookup.getClosestNetworkPt(-120.658215, 35.299585);
   
+  // run an AStar Dijkstra using your start and end points
   const path = graph.findPath(startOfPath, endOfPath, [buildEdgeIdList, buildGeoJsonPath]);
   
-  // path output
+  // example path output
   // {
   //  total_cost: 123.456,
   //  edge_list: [4, 5, 6, 9, 10, 23, 27],
-  //  path: (geojson output here)
+  //  path: (a geojson linestring feature collection)
   // }
       
 }
@@ -64,7 +73,7 @@ By default, `graph.findPath` will output an object with a `total_cost` property:
 }
 ```
 
-To provide richer outputs, you can provide additional "Path Output" functions which can parse Dijkstra internals into usable outputs.
+To provide additional outputs, you can add (or create your own) "Path Output" functions which can parse Dijkstra internals into usable outputs.
 
 Two built-in output functions are:
 
