@@ -221,7 +221,6 @@ Graph.prototype.lookupCoords = function(coord_str) {
   return this.inputLookup[coord_str];
 };
 
-
 Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
   this.pool.reset();
