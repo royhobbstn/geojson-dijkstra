@@ -3,6 +3,7 @@ const cloneGeoJson = require('@turf/clone').default;
 const kdbush = require('kdbush');
 const geokdbush = require('geokdbush');
 const NodeHeap = require('./queue.js');
+const cheapRuler = require('cheap-ruler');
 
 // objects
 exports.Graph = Graph;
@@ -11,7 +12,8 @@ exports.CoordinateLookup = CoordinateLookup;
 // output function helpers
 exports.buildGeoJsonPath = buildGeoJsonPath;
 exports.buildEdgeIdList = buildEdgeIdList;
-exports.buildNodeList = buildNodeList;
+
+const ruler = cheapRuler(35, 'miles');
 
 function Graph(options) {
   this.adjacency_list = {};
@@ -21,10 +23,16 @@ function Graph(options) {
   this.isGeoJson = true;
   this.placement_index = 0;
   this.mutate_inputs = false;
-
+  this.pool = createNodePool();
   if (options && options.allowMutateInputs === true) {
     this.mutate_inputs = true;
   }
+}
+
+function timeHeuristic({ start_lat, start_lng, end_lat, end_lng }) {
+  const dx = start_lng - end_lng;
+  const dy = start_lat - end_lat;
+  return (Math.abs(dx) + Math.abs(dy)) * 7;
 }
 
 function CoordinateLookup(graph) {
@@ -68,7 +76,7 @@ Graph.prototype.save = function(options) {
     paths: this.paths,
     isGeoJson: this.isGeoJson,
     placement_index: this.placement_index,
-    mutate_inputs: this.mutate_inputs,
+    mutate_inputs: this.mutate_inputs
   };
 };
 
@@ -99,6 +107,10 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
   const obj = {
     start: start_node,
     end: end_node,
+    start_lng: startNode[0],
+    start_lat: startNode[1],
+    end_lng: endNode[0],
+    end_lat: endNode[1],
     cost: attributes._cost,
     lookup_index: String(this.placement_index),
     reverse_flag: false
@@ -126,6 +138,10 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
     const reverse_obj = {
       start: String(end_node),
       end: String(start_node),
+      start_lng: endNode[0],
+      start_lat: endNode[1],
+      end_lng: startNode[0],
+      end_lat: startNode[1],
       cost: attributes._cost,
       lookup_index: String(this.placement_index),
       reverse_flag: true
@@ -152,28 +168,89 @@ function Node(obj) {
   this.visited = undefined;
   this.opened = false; // whether has been put in queue
   this.heapIndex = -1;
+  this.score = Infinity;
+  this.heuristic = timeHeuristic({
+    start_lat: obj.start_lat,
+    start_lng: obj.start_lng,
+    end_lat: obj.end_lat,
+    end_lng: obj.end_lng
+  });
 }
+
+function createNodePool() {
+  var currentInCache = 0;
+  var nodeCache = [];
+
+  return {
+    createNewState: createNewState,
+    reset: reset
+  };
+
+  function reset() {
+    currentInCache = 0;
+  }
+
+  function createNewState(node) {
+    var cached = nodeCache[currentInCache];
+    if (cached) {
+      cached.id = node.id;
+      cached.dist = node.dist !== undefined ? node.dist : Infinity;
+      cached.prev = undefined;
+      cached.visited = undefined;
+      cached.opened = false;
+      cached.heapIndex = -1;
+      cached.score = Infinity;
+      cached.heuristic = timeHeuristic({
+        start_lat: node.start_lat,
+        start_lng: node.start_lng,
+        end_lat: node.end_lat,
+        end_lng: node.end_lng
+      });
+    }
+    else {
+      cached = new Node(node);
+      nodeCache[currentInCache] = cached;
+    }
+    currentInCache++;
+    return cached;
+  }
+
+}
+
+Graph.prototype.lookupCoords = function(coord_str) {
+  return this.inputLookup[coord_str];
+};
 
 
 Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
+  this.pool.reset();
+
   const str_start = String(start);
   const str_end = String(end);
+
+  const end_lng = end[0];
+  const end_lat = end[1];
+
+  const start_lng = start[0];
+  const start_lat = start[1];
 
   const nodeState = new Map();
 
   var openSet = new NodeHeap({
     compare: function(a, b) {
-      return a.dist - b.dist;
+      return a.score - b.score;
     },
     setNodeId: function(nodeSearchState, heapIndex) {
       nodeSearchState.heapIndex = heapIndex;
     }
   });
 
-  let current = new Node({ id: str_start, dist: 0 });
+  // let current = new Node({ id: str_start, dist: 0 });
+  let current = this.pool.createNewState({ id: str_start, dist: 0, start_lat, start_lng, end_lat, end_lng });
   nodeState.set(str_start, current);
   current.opened = 1;
+  current.score = current.heuristic;
 
   // quick exit for start === end
   if (str_start === str_end) {
@@ -186,11 +263,10 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
       .forEach(edge => {
 
         const exploring_node = edge.end;
-        const proposed_distance = current.dist + edge.cost;
 
         let node = nodeState.get(exploring_node);
         if (node === undefined) {
-          node = new Node({ id: exploring_node });
+          node = this.pool.createNewState({ id: exploring_node, start_lat: edge.end_lat, start_lng: edge.end_lng, end_lat, end_lng });
           nodeState.set(exploring_node, node);
         }
 
@@ -203,6 +279,7 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
           node.opened = true;
         }
 
+        const proposed_distance = current.dist + edge.cost;
         if (proposed_distance >= node.dist) {
           // longer path
           return;
@@ -210,6 +287,8 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
 
         node.dist = proposed_distance;
         node.prev = current.id;
+        node.score = proposed_distance + node.heuristic;
+
         openSet.updateItem(node.heapIndex);
       });
 
@@ -228,27 +307,49 @@ Graph.prototype.runDijkstra = function(start, end, parseOutputFns) {
   // total cost included by default
   let response = { total_cost: nodeState.get(str_end).dist };
 
-  // // if no output fns specified
-  // if (!parseOutputFns) {
-  //   return response;
-  // }
+  // if no output fns specified
+  if (!parseOutputFns) {
+    return response;
+  }
 
-  // // one callback function
-  // if (!Array.isArray(parseOutputFns)) {
-  //   return Object.assign({}, response, parseOutputFns(this, start, end, prev, dist));
-  // }
+  // one callback function
+  if (!Array.isArray(parseOutputFns)) {
+    return Object.assign({}, response, parseOutputFns(this, nodeState, str_start, str_end));
+  }
 
-  // // array of callback functions
-  // parseOutputFns.forEach(fn => {
-  //   response = Object.assign({}, response, fn(this, start, end, prev, dist));
-  // });
+  // array of callback functions
+  parseOutputFns.forEach(fn => {
+    response = Object.assign({}, response, fn(this, nodeState, str_start, str_end));
+  });
 
   return response;
 };
 
-function buildGeoJsonPath(graph, start, end, prev, dist) {
+function buildEdgeIdList(graph, node_map, start, end) {
+  const edge_list = [];
 
-  let str_end = String(end);
+  if (start === end) {
+    return { edge_list };
+  }
+
+  let current_node = node_map.get(end);
+  let previous_node = node_map.get(current_node.prev);
+  do {
+    const edge = graph.paths[`${previous_node.id}|${current_node.id}`];
+    const index = edge.lookup_index;
+    const properties = graph.properties[index];
+
+    edge_list.push(properties._id);
+    current_node = node_map.get(current_node.prev);
+    previous_node = current_node.prev && node_map.get(current_node.prev);
+  } while (previous_node);
+
+  edge_list.reverse();
+
+  return { edge_list };
+}
+
+function buildGeoJsonPath(graph, node_map, start, end) {
 
   const features = [];
 
@@ -260,113 +361,35 @@ function buildGeoJsonPath(graph, start, end, prev, dist) {
   // note that if any input edges were missing a _geometry property
   // you will not be able to output a geojson path, and the option will be
   // excluded by default
-  if (!graph.isGeoJson) {
-    return path;
+  if (!graph.isGeoJson || start === end) {
+    return { geojsonPath: path };
   }
 
-  while (prev[str_end]) {
-    const lookup = graph.paths[`${prev[str_end]}|${str_end}`];
-    const properties = graph.properties[lookup.lookup_index];
+  let current_node = node_map.get(end);
+  let previous_node = node_map.get(current_node.prev);
+  do {
+    const edge = graph.paths[`${previous_node.id}|${current_node.id}`];
+    const index = edge.lookup_index;
+    const properties = graph.properties[index];
+    const geometry = graph.geometry[index];
 
     const feature = {
       "type": "Feature",
       "properties": properties,
       "geometry": {
         "type": "LineString",
-        "coordinates": graph.geometry[lookup.lookup_index]
+        "coordinates": geometry[index]
       }
     };
     features.push(feature);
 
-    str_end = prev[str_end];
-  }
+    current_node = node_map.get(current_node.prev);
+    previous_node = current_node.prev && node_map.get(current_node.prev);
+  } while (previous_node);
 
   path.features.reverse();
 
   return { geojsonPath: path };
-
-}
-
-function buildEdgeIdList(graph, start, end, prev, dist) {
-
-  let str_end = String(end);
-
-  let edgelist = [];
-
-  while (prev[str_end]) {
-    const lookup = graph.paths[`${prev[str_end]}|${str_end}`];
-    const properties = graph.properties[lookup.lookup_index];
-    edgelist.push(properties._id);
-    str_end = prev[str_end];
-  }
-
-  edgelist.reverse();
-
-  return { edgelist };
-}
-
-function buildNodeList(graph, start, end, prev, dist) {
-
-  let str_end = String(end);
-
-  // all nodes are converted to strings internally, so if its a number
-  // find out now so that it can be converted back later.
-  // will support string, number, and array (as array of 2 lat/lng number coordinates only)
-  // only comes into play if you need to return a nodelist
-  let node_type = typeof end;
-  if (node_type === 'object' && Array.isArray(end)) {
-    node_type = 'array';
-  }
-  else if (node_type !== 'string' && node_type !== 'number') {
-    throw new Error('invalid object input.  takes only numbers, strings, and coordinate arrays');
-  }
-
-  let nodelist = [];
-
-  // prefill first node in nodelist
-  if (node_type === 'string') {
-    nodelist.push(str_end);
-  }
-  else if (node_type === 'number') {
-    nodelist.push(Number(str_end));
-  }
-  else if (node_type === 'array') {
-    nodelist.push(str_end.split(',').map(d => Number(d)));
-  }
-
-  while (prev[str_end]) {
-
-    const lookup = graph.paths[`${prev[str_end]}|${str_end}`];
-
-    if (lookup.reverse_flag) {
-      if (node_type === 'string') {
-        nodelist.push(lookup.end);
-      }
-      else if (node_type === 'number') {
-        nodelist.push(Number(lookup.end));
-      }
-      else if (node_type === 'array') {
-        nodelist.push(lookup.end.split(',').map(d => Number(d)));
-      }
-    }
-    else {
-      if (node_type === 'string') {
-        nodelist.push(lookup.start);
-      }
-      else if (node_type === 'number') {
-        nodelist.push(Number(lookup.start));
-      }
-      else if (node_type === 'array') {
-        nodelist.push(lookup.start.split(',').map(d => Number(d)));
-      }
-    }
-
-    str_end = prev[str_end];
-  }
-
-  nodelist.reverse();
-
-  return { nodelist };
 }
 
 
@@ -390,8 +413,8 @@ Graph.prototype.loadFromGeoJson = function(geo) {
       return;
     }
 
-    const start_vertex = coordinates[0].join(',');
-    const end_vertex = coordinates[coordinates.length - 1].join(',');
+    const start_vertex = coordinates[0];
+    const end_vertex = coordinates[coordinates.length - 1];
 
     // undirected
     if (feature.properties._direction === 'all' || !feature.properties._direction) {
