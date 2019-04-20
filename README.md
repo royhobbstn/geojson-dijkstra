@@ -12,11 +12,13 @@ npm install geojson-dijkstra --save
 ```
 const { Graph, buildEdgeIdList, buildGeoJsonPath } = require('geojson-dijkstra');
 
-const fasterDijkstra = new Graph();
+const graph = new Graph();
 
-async function readyNetwork() {
+main();
 
-  const geojson_raw = await fs.readFile('../networks/full_network.geojson');
+async function main() {
+
+  const geojson_raw = await fs.readFile('./full_network.geojson');
   const geojson = JSON.parse(geojson_raw);
 
   // set up _cost and _id field
@@ -25,25 +27,60 @@ async function readyNetwork() {
     feat.properties._id = feat.properties.ID;
   });
 
-  fasterDijkstra.loadFromGeoJson(geojson);
+  graph.loadFromGeoJson(geojson);
   
-  fasterDijkstra.findPath(
-        [-120.868893, 39.500155],
-        [-120.658215, 35.299585], [buildEdgeIdList, buildGeoJsonPath]
-      );
+  const lookup = new CoordinateLookup();
+  
+  const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
+  const endOfPath = lookup.getClosestNetworkPt(-120.658215, 35.299585);
+  
+  const path = graph.findPath(startOfPath, endOfPath, [buildEdgeIdList, buildGeoJsonPath]);
+  
+  // path output
+  // {
+  //  total_cost: 123.456,
+  //  edge_list: [4, 5, 6, 9, 10, 23, 27],
+  //  path: (geojson output here)
+  // }
+      
 }
 
 ```
 
 ## API
 
+Graph Methods:
 ```
+graph.loadFromGeoJson(geojson);
+````
+
+**Path Output functions:**
+
+By default, `graph.findPath` will output an object with a `total_cost` property:
 
 ```
+{
+  total_cost: 123
+}
+```
+
+To provide richer outputs, you can provide additional "Path Output" functions which can parse Dijkstra internals into usable outputs.
+
+Two built-in output functions are:
+
+```buildGeoJsonPath```
+
+Returns a GeoJson linestring of all edges and properties of the path.
+
+
+```buildEdgeIdList```
+
+Returns an ordered array of edge-ids `[1023, 1024, 1025]`, corresponding to the `_id` property in your input geoJson file.
+
 
 ## How fast is it?
 
-Benchmarking wouldn't be entirely fair.  Most pathfinding libraries are multi-purpose and can't take advantage of the shortcuts I did. For example, knowing that the network is geographic means that I can take advantage of [A*](https://en.wikipedia.org/wiki/A*_search_algorithm) network optimizations by default.  
+Benchmarking wouldn't be entirely fair.  Most pathfinding libraries are multi-purpose and can't take advantage of the shortcuts I did. For example, knowing that the network is geographic means that geojson-dijkstra can use an [A*](https://en.wikipedia.org/wiki/A*_search_algorithm) network optimization by default.  
 
 Suffice to say that if this is not fast enough, you'll probably need to seek a solution implemented in a compiled language.
 

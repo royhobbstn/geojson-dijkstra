@@ -3,7 +3,6 @@ const cloneGeoJson = require('@turf/clone').default;
 const kdbush = require('kdbush');
 const geokdbush = require('geokdbush');
 const NodeHeap = require('./queue.js');
-const cheapRuler = require('cheap-ruler');
 
 // objects
 exports.Graph = Graph;
@@ -12,8 +11,6 @@ exports.CoordinateLookup = CoordinateLookup;
 // output function helpers
 exports.buildGeoJsonPath = buildGeoJsonPath;
 exports.buildEdgeIdList = buildEdgeIdList;
-
-const ruler = cheapRuler(35, 'miles');
 
 function Graph(options) {
   this.adjacency_list = {};
@@ -29,7 +26,7 @@ function Graph(options) {
   }
 }
 
-function timeHeuristic({ start_lat, start_lng, end_lat, end_lng }) {
+function heuristic({ start_lat, start_lng, end_lat, end_lng }) {
   const dx = start_lng - end_lng;
   const dy = start_lat - end_lat;
   return (Math.abs(dx) + Math.abs(dy)) * 7;
@@ -63,32 +60,6 @@ CoordinateLookup.prototype.getClosestNetworkPt = function(lng, lat) {
   return geokdbush.around(this.index, lng, lat, 1)[0];
 };
 
-
-// fully serializable
-// however its possible that it would be quicker to re-build your network
-// since a network representation will typically take up more disk
-// space than a geojson representation of your network
-Graph.prototype.save = function(options) {
-  return {
-    adjacency_list: this.adjacency_list,
-    geometry: this.geometry,
-    properties: this.properties,
-    paths: this.paths,
-    isGeoJson: this.isGeoJson,
-    placement_index: this.placement_index,
-    mutate_inputs: this.mutate_inputs
-  };
-};
-
-Graph.prototype.load = function(parsedGraph) {
-  this.adjacency_list = parsedGraph.adjacency_list;
-  this.geometry = parsedGraph.geometry;
-  this.properties = parsedGraph.properties;
-  this.paths = parsedGraph.paths;
-  this.isGeoJson = parsedGraph.isGeoJson;
-  this.placement_index = parsedGraph.placement_index;
-  this.mutate_inputs = parsedGraph.mutate_inputs;
-};
 
 Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
 
@@ -169,7 +140,7 @@ function Node(obj) {
   this.opened = false; // whether has been put in queue
   this.heapIndex = -1;
   this.score = Infinity;
-  this.heuristic = timeHeuristic({
+  this.heuristic = heuristic({
     start_lat: obj.start_lat,
     start_lng: obj.start_lng,
     end_lat: obj.end_lat,
@@ -200,7 +171,7 @@ function createNodePool() {
       cached.opened = false;
       cached.heapIndex = -1;
       cached.score = Infinity;
-      cached.heuristic = timeHeuristic({
+      cached.heuristic = heuristic({
         start_lat: node.start_lat,
         start_lng: node.start_lng,
         end_lat: node.end_lat,
@@ -216,10 +187,6 @@ function createNodePool() {
   }
 
 }
-
-Graph.prototype.lookupCoords = function(coord_str) {
-  return this.inputLookup[coord_str];
-};
 
 Graph.prototype.findPath = function(start, end, parseOutputFns) {
 
@@ -430,20 +397,6 @@ Graph.prototype.loadFromGeoJson = function(geo) {
 
   });
 
-};
-
-
-Graph.prototype._getComparator = function(dist_node) {
-  // excessive check necessary to distinguish undefined from 0
-  // (dist[node] can on rare circumstances be 'start')
-  if (dist_node === 0) {
-    return 0;
-  }
-  if (dist_node === undefined) {
-    return Infinity;
-  }
-
-  return dist_node;
 };
 
 
