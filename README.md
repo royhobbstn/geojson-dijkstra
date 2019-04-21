@@ -10,49 +10,43 @@ npm install geojson-dijkstra --save
 ```
 
 ```
+const fs = require('fs');
 const { Graph, CoordinateLookup, buildEdgeIdList, buildGeoJsonPath } = require('geojson-dijkstra');
 
-main();
+// load your geoJson file
+const geojson = JSON.parse(fs.readFileSync('./full_network.geojson'));
 
-async function main() {
+// add a _cost field (to signify the weight of an edge)
+// add an _id field (to uniquely identify each edge)
+geojson.features.forEach(feat => {
+  feat.properties._cost = feat.properties.MILES;
+  feat.properties._id = feat.properties.ID;
+});
 
-  // load your geoJson file
-  const geojson_raw = await fs.readFile('./full_network.geojson');
-  const geojson = JSON.parse(geojson_raw);
-
-  // add a _cost field (to signify the weight of an edge)
-  // add an _id field (to uniquely identify each edge)
-  geojson.features.forEach(feat => {
-    feat.properties._cost = feat.properties.MILES;
-    feat.properties._id = feat.properties.ID;
-  });
-
-  // create a new object which will hold the network graph
-  const graph = new Graph();
-  // load geojson into your network
-  graph.loadFromGeoJson(geojson);
+// create a new object which will hold the network graph
+const graph = new Graph();
+// load geojson into your network
+graph.loadFromGeoJson(geojson);
   
-  // initialize a coordinate lookup service (optional)
-  // if you don't use the lookup service, you'll have to make sure that
-  // your start and end points correspond exactly to line segment 
-  // endpoints in your geoJson file (down to the last decimal)
-  const lookup = new CoordinateLookup(graph);
+// initialize a coordinate lookup service (optional)
+// if you don't use the lookup service, you'll have to make sure that
+// your start and end points correspond exactly to line segment 
+// endpoints in your geoJson file (down to the last decimal)
+const lookup = new CoordinateLookup(graph);
   
-  // use the lookup to find the closest network nodes to your input coordinates
-  const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
-  const endOfPath = lookup.getClosestNetworkPt(-120.658215, 35.299585);
+// use the lookup to find the closest network nodes to your input coordinates
+const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
+const endOfPath = lookup.getClosestNetworkPt(-120.658215, 35.299585);
   
-  // run an AStar Dijkstra using your start and end points
-  const path = graph.findPath(startOfPath, endOfPath, [buildEdgeIdList, buildGeoJsonPath]);
+// run an AStar Dijkstra using your start and end points
+const path = graph.findPath(startOfPath, endOfPath, [buildEdgeIdList, buildGeoJsonPath]);
   
-  // example path output
-  // {
-  //  total_cost: 123.456,
-  //  edge_list: [4, 5, 6, 9, 10, 23, 27],
-  //  path: (a geojson linestring feature collection)
-  // }
-      
-}
+// example path output
+// {
+//  total_cost: 123.456,
+//  edge_list: [4, 5, 6, 9, 10, 23, 27],
+//  path: (a geojson linestring feature collection)
+// }
 
 ```
 
@@ -103,10 +97,13 @@ Will append `{ edge_list: [array, of, ids] }` to the response object, where `edg
 A fast geographically indexed coordinate lookup service leveraging [geokdbush](https://github.com/mourner/geokdbush).
 
 ```
-const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
+const lookup = new CoordinateLookup(graph);
+const longitude = -120.868893;
+const latitude = 39.500155;
+const startOfPath = lookup.getClosestNetworkPt(longitude, latitude);
 ```
 
-Provide a longitude and latitude coordinate, and get an array `[lng, lat]` in return corresponding to the nearest node in your network.
+Provide a `longitude` and `latitude` coordinate, and get an array: `[lng, lat]` in return corresponding to the nearest node in your network.
 
 
 ## How fast is it?
@@ -123,6 +120,6 @@ I built this library mainly as a base to build a Contraction Hierarchy and ArcFl
 
 **ArcFlags extension** (in progress)
 
-## How can I make a directed graph
+## How can I make a directed graph?
 
 The internals are in place to make this possible, but they have not been tested. Feel free to dive into the code, but use at your own risk.
