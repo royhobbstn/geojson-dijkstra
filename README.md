@@ -1,7 +1,7 @@
 # geojson-dijkstra
-A fast and flexible implementation of Dijkstra with GeoJSON support for NodeJS.
+A fast and flexible implementation of Dijkstra with [GeoJSON](http://geojson.org/) support for NodeJS.
 
-This repo is heavily indebted to the great [ngraph.path](https://github.com/anvaka/ngraph.path) library by [@anvaka](https://github.com/anvaka).  I set out to make the fastest JavaScript [Dijkstra](https://en.wikipedia.org/wiki/Dijkstra's_algorithm) implementation, but couldn't come remotely close until adopting the object node model and queue used in ngraph.
+This repo is heavily indebted to the great [ngraph.path](https://github.com/anvaka/ngraph.path) library by [@anvaka](https://github.com/anvaka).  I set out to make the fastest JavaScript [Dijkstra](https://en.wikipedia.org/wiki/Dijkstra's_algorithm) implementation, but couldn't come remotely close until adapting the object node model and queue used in ngraph.  If you can't find what you're looking for here, you might appreciate the additional options ngraph provides.
 
 ## Quickstart
 
@@ -36,7 +36,7 @@ async function main() {
   // if you don't use the lookup service, you'll have to make sure that
   // your start and end points correspond exactly to line segment 
   // endpoints in your geoJson file (down to the last decimal)
-  const lookup = new CoordinateLookup();
+  const lookup = new CoordinateLookup(graph);
   
   // use the lookup to find the closest network nodes to your input coordinates
   const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
@@ -58,12 +58,23 @@ async function main() {
 
 ## API
 
-Graph Methods:
+**Graph Methods**
+
 ```
 graph.loadFromGeoJson(geojson);
 ````
+Loads a geoJSON linestring dataset.  Expects a `_cost` attribute on the geoJSON `properties`, denoting the network weight of the edge, as well as an `_id` attribute which will uniquely identify the edge.
 
-**Path Output functions:**
+```
+graph.findPath(startCoordinate, endCoordinate, [outputFunctions])
+```
+Runs the Dijkstra A-Star algorithm from the `startCoordinate` to the `endCoordinate`.  
+
+These coordinates must exactly correspond to network nodes in your graph (the start or end points of actual linestrings in your geoJSON).  Because this can be inconvenient, the library provides a `CoordinateLookup` service which will take an input coordinate, and provide the closest network node.
+
+**outputFunctions:**
+
+This parameter is optional.  You can provide a single function by itself, an array of functions, or nothing at all.
 
 By default, `graph.findPath` will output an object with a `total_cost` property:
 
@@ -73,18 +84,29 @@ By default, `graph.findPath` will output an object with a `total_cost` property:
 }
 ```
 
-To provide additional outputs, you can add (or create your own) "Path Output" functions which can parse Dijkstra internals into usable outputs.
+To provide additional outputs, you can add (or create your own) `outputFunctions` functions which can parse Dijkstra internals into usable outputs.
 
 Two built-in output functions are:
 
 ```buildGeoJsonPath```
 
-Returns a GeoJson linestring of all edges and properties of the path.
+Will append `{ path: (geojson) }` to the response object, where `path` is a GeoJSON linestring of all edges and properties along the shortest path.
 
 
 ```buildEdgeIdList```
 
-Returns an ordered array of edge-ids `[1023, 1024, 1025]`, corresponding to the `_id` property in your input geoJson file.
+Will append `{ edge_list: [array, of, ids] }` to the response object, where `edge_list` is an ordered array of edge-ids `[1023, 1024, 1025]`, corresponding to the `_id` property in your input GeoJSON file.
+
+
+**CoordinateLookup**
+
+A fast geographically indexed coordinate lookup service leveraging [geokdbush](https://github.com/mourner/geokdbush).
+
+```
+const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
+```
+
+Provide a longitude and latitude coordinate, and get an array `[lng, lat]` in return corresponding to the nearest node in your network.
 
 
 ## How fast is it?
@@ -101,3 +123,6 @@ I built this library mainly as a base to build a Contraction Hierarchy and ArcFl
 
 **ArcFlags extension** (in progress)
 
+## How can I make a directed graph
+
+The internals are in place to make this possible, but they have not been tested. Feel free to dive into the code, but use at your own risk.

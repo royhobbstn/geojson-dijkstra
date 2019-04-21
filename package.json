@@ -25,7 +25,6 @@
   "homepage": "https://github.com/royhobbstn/faster-dijkstra#readme",
   "dependencies": {
     "@turf/clone": "6.0.2",
-    "cheap-ruler": "^2.5.1",
     "geokdbush": "1.1.0",
     "kdbush": "1.0.1"
   }
