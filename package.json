@@ -1,5 +1,5 @@
 {
-  "name": "faster-dijkstra",
+  "name": "geojson-dijkstra",
   "version": "0.0.1",
   "description": "faster, feature rich dijkstra for real world applications",
   "main": "index.js",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/royhobbstn/faster-dijkstra.git"
+    "url": "git+https://github.com/royhobbstn/geojson-dijkstra.git"
   },
   "keywords": [
     "dijkstra",
@@ -20,9 +20,9 @@
   "author": "Daniel Trone",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/royhobbstn/faster-dijkstra/issues"
+    "url": "https://github.com/royhobbstn/geojson-dijkstra/issues"
   },
-  "homepage": "https://github.com/royhobbstn/faster-dijkstra#readme",
+  "homepage": "https://github.com/royhobbstn/geojson-dijkstra#readme",
   "dependencies": {
     "@turf/clone": "6.0.2",
     "geokdbush": "1.1.0",
