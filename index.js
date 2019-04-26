@@ -132,20 +132,21 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
 
 };
 
-function Node(obj) {
-  this.id = obj.id;
-  this.dist = obj.dist !== undefined ? obj.dist : Infinity;
+function Node(node) {
+  this.id = node.id;
+  this.dist = node.dist !== undefined ? node.dist : Infinity;
   this.prev = undefined;
   this.visited = undefined;
   this.opened = false; // whether has been put in queue
   this.heapIndex = -1;
   this.score = Infinity;
-  this.heuristic = heuristic({
-    start_lat: obj.start_lat,
-    start_lng: obj.start_lng,
-    end_lat: obj.end_lat,
-    end_lng: obj.end_lng
-  });
+  // only use heuristic if given coordinates
+  this.heuristic = node.start_lat ? heuristic({
+    start_lat: node.start_lat,
+    start_lng: node.start_lng,
+    end_lat: node.end_lat,
+    end_lng: node.end_lng
+  }) : 0;
 }
 
 function createNodePool() {
@@ -171,12 +172,13 @@ function createNodePool() {
       cached.opened = false;
       cached.heapIndex = -1;
       cached.score = Infinity;
-      cached.heuristic = heuristic({
+      // only use heuristic if given coordinates
+      cached.heuristic = node.start_lat ? heuristic({
         start_lat: node.start_lat,
         start_lng: node.start_lng,
         end_lat: node.end_lat,
         end_lng: node.end_lng
-      });
+      }) : 0;
     }
     else {
       cached = new Node(node);
@@ -205,7 +207,6 @@ Graph.prototype.findPath = function(start, end, parseOutputFns) {
 
   var openSet = new NodeHeap();
 
-  // let current = new Node({ id: str_start, dist: 0 });
   let current = this.pool.createNewState({ id: str_start, dist: 0, start_lat, start_lng, end_lat, end_lng });
   nodeState.set(str_start, current);
   current.opened = 1;

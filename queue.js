@@ -15,11 +15,15 @@ function NodeHeap(data, options) {
 
   options = options || {};
 
+  if (!options.rank) {
+    options.rank = 'score';
+  }
+
   this.data = [];
   this.length = 0;
 
   this.compare = (a, b) => {
-    return a.score - b.score;
+    return a[options.rank] - b[options.rank];
   };
 
   this.setNodeId = (nodeSearchState, heapIndex) => {

@@ -57,7 +57,7 @@ const path = graph.findPath(startOfPath, endOfPath, [buildEdgeIdList, buildGeoJs
 ```
 graph.loadFromGeoJson(geojson);
 ````
-Loads a geoJSON linestring dataset.  Expects a `_cost` attribute on the geoJSON `properties`, denoting the network weight of the edge, as well as an `_id` attribute which will uniquely identify the edge.
+Loads a geoJSON linestring dataset.  Expects a `_cost` attribute on the geoJSON `properties` representing the network weight of the edge, as well as an `_id` attribute which will uniquely identify the edge.
 
 ```
 graph.findPath(startCoordinate, endCoordinate, [outputFunctions])
@@ -114,7 +114,7 @@ Suffice to say that if this is not fast enough, you'll probably need to seek a s
 
 ## Flexible?
 
-I built this library mainly as a base to build a Contraction Hierarchy and ArcFlags implementation.  As these libraries rely on modified implementations of Dijkstras algorithm for processing, I needed to create the fastest implementation possible that was still flexible enough to accomodate these use cases.
+I built this library mainly as a base to build a Contraction Hierarchy and ArcFlags implementation.  As these algorithms rely on modified implementations of Dijkstras algorithm for processing, I needed to create the fastest implementation possible that was still flexible enough to accomodate these use cases.
 
 **Contraction Hierarchy extension** (in progress)
 
