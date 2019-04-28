@@ -1,6 +1,6 @@
 {
   "name": "geojson-dijkstra",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "faster, feature rich dijkstra for real world applications",
   "main": "index.js",
   "scripts": {
