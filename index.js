@@ -347,7 +347,7 @@ function buildGeoJsonPath(graph, node_map, start, end) {
       "properties": properties,
       "geometry": {
         "type": "LineString",
-        "coordinates": geometry[index]
+        "coordinates": geometry
       }
     };
     features.push(feature);
