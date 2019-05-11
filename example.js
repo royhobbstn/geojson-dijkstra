@@ -7,6 +7,8 @@ const network = new Graph();
 
 network.loadFromGeoJson(geojson);
 
+console.log(network)
+
 const lookup = new CoordinateLookup(network);
 
 const coords1 = lookup.getClosestNetworkPt(-100, 43);

@@ -16,7 +16,6 @@ function Graph(options) {
   this.adjacency_list = {};
   this.geometry = {};
   this.properties = {};
-  this.paths = {};
   this.isGeoJson = true;
   this.placement_index = 0;
   this.mutate_inputs = false;
@@ -101,7 +100,6 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
   }
 
   this.properties[this.placement_index] = attributes;
-  this.paths[`${start_node}|${end_node}`] = obj;
 
   // add reverse path
   if (isUndirected) {
@@ -125,7 +123,6 @@ Graph.prototype.addEdge = function(startNode, endNode, attrs, isUndirected) {
       this.adjacency_list[end_node] = [reverse_obj];
     }
 
-    this.paths[`${end_node}|${start_node}`] = reverse_obj;
   }
 
   this.placement_index++;
@@ -205,7 +202,7 @@ Graph.prototype.findPath = function(start, end, parseOutputFns) {
 
   const nodeState = new Map();
 
-  var openSet = new NodeHeap();
+  var openSet = new NodeHeap({ rank: 'score' });
 
   let current = this.pool.createNewState({ id: str_start, dist: 0, start_lat, start_lng, end_lat, end_lng });
   nodeState.set(str_start, current);
@@ -222,12 +219,10 @@ Graph.prototype.findPath = function(start, end, parseOutputFns) {
     this.adjacency_list[current.id]
       .forEach(edge => {
 
-        const exploring_node = edge.end;
-
-        let node = nodeState.get(exploring_node);
+        let node = nodeState.get(edge.end);
         if (node === undefined) {
-          node = this.pool.createNewState({ id: exploring_node, start_lat: edge.end_lat, start_lng: edge.end_lng, end_lat, end_lng });
-          nodeState.set(exploring_node, node);
+          node = this.pool.createNewState({ id: edge.end, start_lat: edge.end_lat, start_lng: edge.end_lng, end_lat, end_lng });
+          nodeState.set(edge.end, node);
         }
 
         if (node.visited === true) {
@@ -246,7 +241,7 @@ Graph.prototype.findPath = function(start, end, parseOutputFns) {
         }
 
         node.dist = proposed_distance;
-        node.prev = current.id;
+        node.prev = edge;
         node.score = proposed_distance + node.heuristic;
 
         openSet.updateItem(node.heapIndex);
@@ -257,7 +252,13 @@ Graph.prototype.findPath = function(start, end, parseOutputFns) {
     // get lowest value from heap
     current = openSet.pop();
 
+    if (!current) {
+      console.log("There is no path");
+      break;
+    }
+
     // exit early if current node becomes end node
+    // todo what is !current?
     if (current.id === str_end) {
       current = '';
     }
@@ -265,7 +266,8 @@ Graph.prototype.findPath = function(start, end, parseOutputFns) {
 
 
   // total cost included by default
-  let response = { total_cost: nodeState.get(str_end).dist };
+  const last_node = nodeState.get(str_end);
+  let response = { total_cost: (last_node && last_node.dist) || 0 };
 
   // if no output fns specified
   if (!parseOutputFns) {
@@ -293,16 +295,19 @@ function buildEdgeIdList(graph, node_map, start, end) {
   }
 
   let current_node = node_map.get(end);
-  let previous_node = node_map.get(current_node.prev);
+
+  if (!current_node) {
+    // no path
+    return { edge_list };
+  }
+
   do {
-    const edge = graph.paths[`${previous_node.id}|${current_node.id}`];
+    const edge = current_node.prev;
     const index = edge.lookup_index;
     const properties = graph.properties[index];
-
     edge_list.push(properties._id);
-    current_node = node_map.get(current_node.prev);
-    previous_node = current_node.prev && node_map.get(current_node.prev);
-  } while (previous_node);
+    current_node = node_map.get(edge.start);
+  } while (current_node && current_node.prev);
 
   edge_list.reverse();
 
@@ -326,13 +331,17 @@ function buildGeoJsonPath(graph, node_map, start, end) {
   }
 
   let current_node = node_map.get(end);
-  let previous_node = node_map.get(current_node.prev);
+
+  if (!current_node) {
+    // no path
+    return { geojsonPath: path };
+  }
+
   do {
-    const edge = graph.paths[`${previous_node.id}|${current_node.id}`];
+    const edge = current_node.prev;
     const index = edge.lookup_index;
     const properties = graph.properties[index];
     const geometry = graph.geometry[index];
-
     const feature = {
       "type": "Feature",
       "properties": properties,
@@ -342,10 +351,8 @@ function buildGeoJsonPath(graph, node_map, start, end) {
       }
     };
     features.push(feature);
-
-    current_node = node_map.get(current_node.prev);
-    previous_node = current_node.prev && node_map.get(current_node.prev);
-  } while (previous_node);
+    current_node = node_map.get(edge.start);
+  } while (current_node && current_node.prev);
 
   path.features.reverse();
 
