@@ -52,6 +52,16 @@ const path = graph.findPath(startOfPath, endOfPath, [buildEdgeIdList, buildGeoJs
 
 ## API
 
+```
+const graph = new Graph(options_object);
+```
+
+Create new new graph.  `options_object` is an object with the following (optional) properties:
+
+`mutate_inputs`: (default false)
+
+Allows the mutation of the source dataset.  Dramatically speeds up loading large datasets.  Do not use this options if your in-memory geojson will be used in other places in your application.
+
 **Graph Methods**
 
 ```
