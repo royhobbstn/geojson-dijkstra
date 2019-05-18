@@ -25,7 +25,10 @@
   "homepage": "https://github.com/royhobbstn/geojson-dijkstra#readme",
   "dependencies": {
     "@turf/clone": "6.0.2",
+    "cheap-ruler": "^2.5.1",
     "geokdbush": "1.1.0",
-    "kdbush": "1.0.1"
+    "kdbush": "1.0.1",
+    "ngraph.graph": "0.0.18",
+    "ngraph.path": "^1.1.0"
   }
 }

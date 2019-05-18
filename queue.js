@@ -11,25 +11,31 @@
 
 module.exports = NodeHeap;
 
-function NodeHeap(data, options) {
+function NodeHeap(options) {
+  if (!(this instanceof NodeHeap)) return new NodeHeap(options);
 
   options = options || {};
 
-  if (!options.rank) {
-    options.rank = 'score';
+  if (!options.compare) {
+    throw new Error("Please supply a comparison function to NodeHeap");
   }
 
   this.data = [];
-  this.length = 0;
-
-  this.compare = (a, b) => {
-    return a[options.rank] - b[options.rank];
-  };
-
-  this.setNodeId = (nodeSearchState, heapIndex) => {
+  this.length = this.data.length;
+  this.compare = options.compare;
+  this.setNodeId = function(nodeSearchState, heapIndex) {
     nodeSearchState.heapIndex = heapIndex;
   };
 
+  if (this.length > 0) {
+    for (var i = (this.length >> 1); i >= 0; i--) this._down(i);
+  }
+
+  if (options.setNodeId) {
+    for (var i = 0; i < this.length; ++i) {
+      this.setNodeId(this.data[i], i);
+    }
+  }
 }
 
 NodeHeap.prototype = {
