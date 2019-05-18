@@ -20,7 +20,7 @@ geojson.features = geojson.features.map(feat => {
 
 // clean and filter network
 geojson.features = geojson.features.filter(feat => {
-  if (feat.properties._cost && feat.geometry.coordinates /*&& feat.properties.STFIPS === 6*/ ) {
+  if (feat.properties._cost && feat.geometry.coordinates && feat.properties.STFIPS === 11) {
     return true;
   }
 });
@@ -33,7 +33,7 @@ const heuristic = function(fromCoords, toCoords) {
 };
 
 console.time('createGraph');
-const graph = new Graph(geojson, { mutate_inputs: true, heuristic });
+const graph = new Graph(geojson, { mutate_inputs: true });
 console.timeEnd('createGraph');
 
 console.time('createCoordinateLookup');
@@ -57,37 +57,96 @@ const pathFinder = pathNGraph.aStar(ngraph, {
 const finder = graph.createFinder({ heuristic, parseOutputFns: [buildGeoJsonPath, buildEdgeIdList] });
 const finder2 = graph.createFinder({ parseOutputFns: [buildGeoJsonPath, buildEdgeIdList] });
 
+
+
+const adj_keys = Object.keys(graph.adjacency_list);
+const adj_length = adj_keys.length;
+
+
+
 const coords1 = lookup.getClosestNetworkPt(-88.098578, 44.488832);
 //const coords1 = lookup.getClosestNetworkPt(-121.9436463, 37.6992976);
 const coords2 = lookup.getClosestNetworkPt(-120.6713655, 35.296016);
 
-const start = coords1;
-const end = coords2;
+const coords = [];
 
-let a;
-console.time('nGraph');
-for (let i = 0; i < 100; i++) {
-  a = getNGraphDist(pathFinder.find(coords1, coords2));
+for (let i = 0; i < 5000; i++) {
+  const rnd1 = Math.floor(Math.random() * adj_length);
+  const rnd2 = Math.floor(Math.random() * adj_length);
+  const coord = [adj_keys[rnd1].split(',').map(d => Number(d)), adj_keys[rnd2].split(',').map(d => Number(d))];
+  // const coord = ['-117.958443,33.853954', '-115.551277,32.76506'];
+  coords.push(coord);
 }
-console.timeEnd('nGraph');
-console.log(a.distance);
 
-let b;
-console.time('runningTime');
-for (let i = 0; i < 100; i++) {
-  b = finder.findPath(start, end);
+
+const ng = [];
+const fa = [];
+const fd = [];
+
+
+coords.forEach((pair, index) => {
+  process.stdout.write(
+    'Processing ' +
+    ((index / coords.length) * 100).toFixed(2) +
+    '% complete... ' +
+    index +
+    '  ' +
+    pair +
+    '                 \r\n'
+  );
+  console.log('----');
+
+
+  console.time('nGraph');
+  ng[index] = getNGraphDist(pathFinder.find(pair[0], pair[1]));
+  console.timeEnd('nGraph');
+
+  console.time('fa');
+  fa[index] = finder.findPath(pair[0], pair[1]);
+  console.timeEnd('fa');
+
+  console.time('fd');
+  fd[index] = finder2.findPath(pair[0], pair[1]);
+  console.timeEnd('fd');
+});
+
+
+
+let error_count = 0;
+for (let i = 0; i < coords.length; i++) {
+  const values = [
+    ng[i].distance,
+    fa[i].total_cost,
+    fd[i].total_cost,
+  ];
+
+  let min = Infinity;
+  let max = -Infinity;
+
+  values.forEach(val => {
+    if (val < min) {
+      min = val;
+    }
+    if (val > max) {
+      max = val;
+    }
+  });
+
+  if (max - min > 0.000001) {
+    error_count++;
+    console.log(
+      i,
+      coords[i],
+      ng[i].distance,
+      ng[i].edgelist.length,
+      fa[i].total_cost,
+      fa[i].edge_list.length,
+      fd[i].total_cost,
+      fd[i].edge_list.length
+    );
+  }
 }
-console.timeEnd('runningTime');
-console.log(b.total_cost);
-
-let c;
-console.time('std');
-for (let i = 0; i < 100; i++) {
-  c = finder2.findPath(start, end);
-}
-console.timeEnd('std');
-console.log(c.total_cost);
-
+console.log(`There were ${error_count} errors.`);
 
 function getMPH(nhs) {
   switch (nhs) {

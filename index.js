@@ -21,7 +21,6 @@ function Graph(geojson, options) {
   this.mutate_inputs = false;
   this.mutate_inputs = Boolean(options.allowMutateInputs);
   this._loadFromGeoJson(geojson);
-  this._heuristic = options.heuristic || noOp;
 }
 
 function noOp() {
@@ -193,7 +192,7 @@ Graph.prototype.createFinder = function(options) {
       }
     });
 
-    let current = pool.createNewState({ id: str_start, dist: 0 }, 0);
+    let current = pool.createNewState({ id: str_start, dist: 0 }, heuristicFn(start, end));
     nodeState.set(str_start, current);
     current.opened = 1;
 
