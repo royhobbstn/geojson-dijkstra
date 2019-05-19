@@ -8,7 +8,7 @@ const cheapRuler = require('cheap-ruler');
 const ruler = cheapRuler(35, 'miles');
 
 
-const geofile = JSON.parse(fs.readFileSync('./faf.geojson'));
+const geofile = JSON.parse(fs.readFileSync('./faf.geojson')); //faf
 
 
 // set up _cost and _id fields
@@ -55,13 +55,15 @@ const pathFinder = pathNGraph.aStar(ngraph, {
     // for A*, your heuristic should never overestimate
     // so I'm assuming 70mph on a straight line distance
     return (ruler.distance([fromNode.data.lng, fromNode.data.lat], [toNode.data.lng, toNode.data.lat]) / 100) * 60;
-  }
+  },
+  oriented: true
 });
 
 const pathFinder2 = pathNGraph.aStar(ngraph, {
   distance(fromNode, toNode, link) {
     return link.data._cost;
-  }
+  },
+  oriented: true
 });
 
 const finder = graph.createFinder({ heuristic, parseOutputFns: [buildGeoJsonPath, buildEdgeIdList] });
@@ -85,8 +87,8 @@ for (let i = 0; i < 100; i++) {
   const rnd2 = Math.floor(Math.random() * adj_length);
   const coord = [adj_keys[rnd1].split(',').map(d => Number(d)), adj_keys[rnd2].split(',').map(d => Number(d))];
   // const coord = [
-  //   coords1,
-  //   coords2
+  //   [-113.132497, 41.902277],
+  //   [-109.306339, 42.244785]
   // ];
   coords.push(coord);
 }
@@ -100,7 +102,7 @@ const fd = [];
 
 coords.forEach((pair, index) => {
   process.stdout.write(
-    'Processing ' +
+    '\n\nProcessing ' +
     ((index / coords.length) * 100).toFixed(2) +
     '% complete... ' +
     index +

@@ -59,7 +59,7 @@ const path = finder.findPath(startOfPath, endOfPath);
 
 ## Input GeoJSON
 
-Each geojson feature must contain an `_id` property (as a number) and a `_cost` property (as a number).
+Each geojson feature must contain an `_id` property (as a number) and a `_cost` property (as a number. can not be zero.).
 
 Additionally, the following properties can be used to customize:
 
@@ -73,7 +73,7 @@ Additionally, the following properties can be used to customize:
 const graph = new Graph(geojson, options_object);
 ```
 
-On each feature's `properties` object your geojson must have a `_cost` attribute and a unique `_id` attribute.
+On each feature's `properties` object your geojson must have a non-zero numeric `_cost` attribute and a unique numeric `_id` attribute.
 
 Create new new graph.  `options_object` is an object with the following (optional) property:
 

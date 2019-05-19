@@ -81,7 +81,7 @@ Graph.prototype._addEdge = function(startNode, endNode, attrs, isUndirected) {
     start_lat: startNode[1],
     end_lng: endNode[0],
     end_lat: endNode[1],
-    cost: attributes._cost,
+    cost: attributes._forward_cost || attributes._cost,
     attributes,
     geometry
   };
@@ -104,7 +104,7 @@ Graph.prototype._addEdge = function(startNode, endNode, attrs, isUndirected) {
       start_lat: endNode[1],
       end_lng: startNode[0],
       end_lat: startNode[1],
-      cost: attributes._cost,
+      cost: attributes._forward_cost || attributes._cost,
       attributes,
       geometry
     };
