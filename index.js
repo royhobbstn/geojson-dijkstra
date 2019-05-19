@@ -17,7 +17,6 @@ function Graph(geojson, options) {
     options = {};
   }
   this.adjacency_list = {};
-  this.isGeoJson = true;
   this.mutate_inputs = false;
   this.mutate_inputs = Boolean(options.allowMutateInputs);
   this._loadFromGeoJson(geojson);
@@ -28,10 +27,6 @@ function noOp() {
 }
 
 function CoordinateLookup(graph) {
-  // if one or more features are missing _geometry attributes
-  if (!graph.isGeoJson) {
-    throw new Error('Coordinate Lookup can only be used on geographic datasets');
-  }
 
   const points_set = new Set();
 
@@ -62,13 +57,8 @@ Graph.prototype._addEdge = function(startNode, endNode, attrs, isUndirected) {
   let geometry = undefined;
 
   // any feature without _geometry disables geojson output
-  if (!attributes._geometry) {
-    this.isGeoJson = false;
-  }
-  else {
-    geometry = attributes._geometry;
-    delete attributes._geometry;
-  }
+  geometry = attributes._geometry;
+  delete attributes._geometry; // todo not sure i like this
 
   const start_node = String(startNode);
   const end_node = String(endNode);
@@ -311,13 +301,16 @@ function buildGeoJsonPath(graph, node_map, start, end) {
   // note that if any input edges were missing a _geometry property
   // you will not be able to output a geojson path, and the option will be
   // excluded by default
-  if (!graph.isGeoJson || start === end) {
+  if (start === end) {
+    console.log('bail start end')
+
     return { geojsonPath: path };
   }
 
   let current_node = node_map.get(end);
 
   if (!current_node) {
+    console.log('bail no current')
     // no path
     return { geojsonPath: path };
   }
@@ -347,9 +340,6 @@ Graph.prototype._loadFromGeoJson = function(geo) {
   // turf clone is faster than JSON.parse(JSON.stringify(x))
   // still regretable vs mutating - avoid if possible
   const copy = !this.mutate_inputs ? cloneGeoJson(geo).features : geo.features;
-
-  // using loadFromGeoJson enables geojson output
-  this.isGeoJson = true;
 
   // cleans geojson (mutates in place)
   const features = this._cleanseGeoJsonNetwork(copy);

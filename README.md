@@ -12,54 +12,31 @@ npm install geojson-dijkstra --save
 
 ```
 const fs = require('fs');
-const { Graph, CoordinateLookup, buildEdgeIdList, buildGeoJsonPath } = require('geojson-dijkstra');
+const { Graph, CoordinateLookup, buildGeoJsonPath, buildEdgeIdList } = require('geojson-dijkstra');
 
-// load your geoJson file
-const geojson = JSON.parse(fs.readFileSync('./full_network.geojson'));
+const geojson = JSON.parse(fs.readFileSync('./networks/test.geojson'));
 
-// add a _cost field (to signify the weight of an edge)
-// add an _id field (to uniquely identify each edge)
-geojson.features.forEach(feat => {
-  feat.properties._cost = feat.properties.MILES;
-  feat.properties._id = feat.properties.ID;
-});
-
-// create a new object which will hold the network graph
 const graph = new Graph(geojson);
-  
-// initialize a coordinate lookup service (optional)
-// if you don't use the lookup service, you'll have to make sure that
-// your start and end points correspond exactly to line segment 
-// endpoints in your geoJson file (down to the last decimal)
+
+// create a coordinate lookup to be able to input arbitrary coordinate pairs
+// and return the nearest coordinates in the network
 const lookup = new CoordinateLookup(graph);
-  
-// use the lookup to find the closest network nodes to your input coordinates
-const startOfPath = lookup.getClosestNetworkPt(-120.868893, 39.500155);
-const endOfPath = lookup.getClosestNetworkPt(-120.658215, 35.299585);
+const coords1 = lookup.getClosestNetworkPt(-101.359, 43.341);
+const coords2 = lookup.getClosestNetworkPt(-91.669, 40.195);
 
-// define heuristic for A* (optional)
-const heuristic = function(fromCoords, toCoords) {
-  // todo
-};
+// create a finder, in which you may specify your A* heuristic (optional)
+// and add extra attributes to the result object
+const finder = graph.createFinder({ parseOutputFns: [buildGeoJsonPath, buildEdgeIdList] });
 
-
-const finder = graph.createFinder({heuristic, outputFns: [buildEdgeIdList, buildGeoJsonPath]});
-
-// run an AStar Dijkstra using your start and end points
-const path = finder.findPath(startOfPath, endOfPath);
-  
-// example path output
-// {
-//  total_cost: 123.456,
-//  edge_list: [4, 5, 6, 9, 10, 23, 27],
-//  path: (a geojson linestring feature collection)
-// }
+// the result will contain a total_cost attribute,
+// as well as additional attributes you specified when creating a finder
+const result = finder.findPath(coords1, coords2);
 
 ```
 
 ## Input GeoJSON
 
-Each geojson feature must contain an `_id` property (as a number) and a `_cost` property (as a number. can not be zero.).
+Each geojson feature's `properties` object must contain an `_id` attribute (as a number) and a `_cost` attribute (as a non-zero number).
 
 Additionally, the following properties can be used to customize:
 
@@ -72,8 +49,6 @@ Additionally, the following properties can be used to customize:
 ```
 const graph = new Graph(geojson, options_object);
 ```
-
-On each feature's `properties` object your geojson must have a non-zero numeric `_cost` attribute and a unique numeric `_id` attribute.
 
 Create new new graph.  `options_object` is an object with the following (optional) property:
 
@@ -122,7 +97,7 @@ Will append `{ path: (geojson) }` to the response object, where `path` is a GeoJ
 
 Will append `{ edge_list: [array, of, ids] }` to the response object, where `edge_list` is an ordered array of edge-ids `[1023, 1024, 1025]`, corresponding to the `_id` property in your input GeoJSON file.
 
-
+**Finder Methods**
 
 ```
 const path = finder.findPath(startCoordinates, endCoordinates);
@@ -143,7 +118,7 @@ const latitude = 39.500155;
 const startOfPath = lookup.getClosestNetworkPt(longitude, latitude);
 ```
 
-Provide a `longitude` and `latitude` coordinate, and get an array: `[lng, lat]` in return corresponding to the nearest node in your network.
+Provide a `longitude` and `latitude` coordinate, and receive an array: `[lng, lat]` corresponding to the nearest node in your network.
 
 
 ## How fast is it?
