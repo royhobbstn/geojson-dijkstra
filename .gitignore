@@ -60,9 +60,7 @@ typings/
 # next.js build output
 .next
 
-
-full_network.geojson
-
 .idea
 
 faf.geojson
+full_network.geojson

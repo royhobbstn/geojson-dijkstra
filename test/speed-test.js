@@ -1,14 +1,14 @@
 const fs = require('fs');
-const { Graph, buildGeoJsonPath, buildEdgeIdList } = require('./index.js');
+const { Graph, buildGeoJsonPath, buildEdgeIdList } = require('../index.js');
 const createGraph = require('ngraph.graph');
 const pathNGraph = require('ngraph.path');
-const { getNGraphDist, populateNGraph, cleanseNetwork } = require('../contraction-hierarchy-js/test/test-util.js');
+const { getNGraphDist, populateNGraph, cleanseNetwork } = require('./test-util.js');
 const cheapRuler = require('cheap-ruler');
 
 const ruler = cheapRuler(35, 'miles');
 
 
-const geofile = JSON.parse(fs.readFileSync('./faf.geojson'));
+const geofile = JSON.parse(fs.readFileSync('../networks/faf.geojson'));
 
 
 // set up _cost and _id fields

@@ -240,7 +240,7 @@ Graph.prototype.createFinder = function(options) {
       current = openSet.pop();
 
       if (!current) {
-        console.log("There is no path");
+        // there is no path.  distance will be set to 0
         break;
       }
 
