@@ -302,15 +302,12 @@ function buildGeoJsonPath(graph, node_map, start, end) {
   // you will not be able to output a geojson path, and the option will be
   // excluded by default
   if (start === end) {
-    console.log('bail start end')
-
     return { geojsonPath: path };
   }
 
   let current_node = node_map.get(end);
 
   if (!current_node) {
-    console.log('bail no current')
     // no path
     return { geojsonPath: path };
   }
@@ -331,7 +328,7 @@ function buildGeoJsonPath(graph, node_map, start, end) {
 
   path.features.reverse();
 
-  return { geojsonPath: path };
+  return { geojsonPath: detangle(path) };
 }
 
 
@@ -438,3 +435,62 @@ Graph.prototype._cleanseGeoJsonNetwork = function(features) {
   });
 
 };
+
+
+
+function detangle(geo) {
+
+  // ------ de-tangle routine
+
+  // copy source to avoid mutation
+  const features = JSON.parse(JSON.stringify(geo)).features;
+
+  const collection = {
+    type: "FeatureCollection",
+    features: features
+  };
+
+  // if only one feature return
+  if (features.length <= 1) {
+    return collection;
+  }
+
+  // modify first feature
+  const cf = features[0];
+  const nf = features[1];
+
+  const ce = cf.geometry.coordinates[cf.geometry.coordinates.length - 1];
+
+  const ns = nf.geometry.coordinates[0];
+  const ne = nf.geometry.coordinates[nf.geometry.coordinates.length - 1];
+
+  // in case of ce !== ns && ce !== ne. (flip first feature)
+
+  // ce === ns
+  const ce_ns = ce[0] === ns[0] && ce[1] === ns[1];
+  // ce === ne
+  const ce_ne = ce[0] === ne[0] && ce[1] === ne[1];
+
+  if (!ce_ns && !ce_ne) {
+    features[0].geometry.coordinates.reverse();
+  }
+
+  // modify rest of the features to match orientation of the first
+  for (let i = 1; i < features.length; i++) {
+    const lastFeature = features[i - 1];
+    const currentFeature = features[i];
+
+    const last_end = lastFeature.geometry.coordinates[lastFeature.geometry.coordinates.length - 1];
+    const current_end = currentFeature.geometry.coordinates[currentFeature.geometry.coordinates.length - 1];
+
+    // in the case of last_end == current_end  (flip this)
+    const le_ce = last_end[0] === current_end[0] && last_end[1] === current_end[1];
+
+    if (le_ce) {
+      currentFeature.geometry.coordinates.reverse();
+    }
+
+  }
+
+  return collection;
+}
