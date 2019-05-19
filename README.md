@@ -1,8 +1,8 @@
 # geojson-dijkstra
 
-A fast and flexible implementation of Dijkstra with [GeoJSON](http://geojson.org/) support for NodeJS.
+A GeoJSON-first implementation of [Dijkstra](https://en.wikipedia.org/wiki/Dijkstra's_algorithm) and [A*](https://en.wikipedia.org/wiki/A*_search_algorithm) for NodeJS.
 
-This repo is heavily indebted to the great [ngraph.path](https://github.com/anvaka/ngraph.path) library by [@anvaka](https://github.com/anvaka).  I set out to make the fastest JavaScript [Dijkstra](https://en.wikipedia.org/wiki/Dijkstra's_algorithm) implementation, but couldn't come remotely close until adapting the object node model and queue used in ngraph.  If you can't find what you're looking for here, you might appreciate the additional options ngraph provides.
+This repo is heavily indebted to the great [ngraph.path](https://github.com/anvaka/ngraph.path) library by [@anvaka](https://github.com/anvaka).  After much trial and error, I was unable to match the speed of NGraph on my own.  As a result, a substantial portion of the data model is derived from the ngraph implementation.  If you are looking for a more flexible, general-purpose pathfinding library, you should consider using NGraph instead.
 
 ## Quickstart
 
@@ -66,7 +66,7 @@ Creates a `finder` object with one property; the `findPath` function.
 
 The `options_object` for `graph.createFinder` includes the following **optional** properties:
 
-`heuristicFn`:  This activates A* mode, and will dramatically speed up routing.  Without a heuristic function your path will be routed by a standard implementation of Dijkstra algorithm.
+`heuristic`:  This activates A* mode, and will dramatically speed up routing.  Without a heuristic function your path will be routed by a standard implementation of Dijkstra algorithm.
 
 Sending in a heuristic function that has not been properly considered can result in finding suboptimal paths, and a slower running time, so beware!
 
@@ -103,7 +103,7 @@ Will append `{ edge_list: [array, of, ids] }` to the response object, where `edg
 const path = finder.findPath(startCoordinates, endCoordinates);
 ```
 
-Runs Dijkstra's algorithm from the `startCoordinates` to the `endCoordinates`.  
+Runs Dijkstra's algorithm from the `startCoordinates` to the `endCoordinates`.  Coordinates must be in the form of [lng, lat], where `lng` and `lat` are both numbers (not strings!).
 
 These coordinates must exactly correspond to network nodes in your graph (the start or end points of actual linestrings in your geoJSON).  Because this can be inconvenient, the library provides a `CoordinateLookup` service which will take an input coordinate, and provide the closest network node.
 
@@ -125,10 +125,10 @@ Provide a `longitude` and `latitude` coordinate, and receive an array: `[lng, la
 
 Suffice to say; if this is not fast enough, you'll need to seek a solution implemented in a compiled language.
 
-## Flexible?
+## Motivation?
 
 I built this library mainly as a data-structure base to build a [Contraction Hierarchy](https://en.wikipedia.org/wiki/Contraction_hierarchies).
 
-Pre-processing a graph with a Contraction Hiererarchy can realize dramatic speeds that far surpass A*.
+Pre-processing a graph using a Contraction Hiererarchy can result in pathfinding performance that far exceeds A*.
 
 **[Contraction Hierarchy](https://github.com/royhobbstn/contraction-hierarchy-js) project** (in progress)
