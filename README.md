@@ -2,7 +2,9 @@
 
 A GeoJSON-first implementation of [Dijkstra](https://en.wikipedia.org/wiki/Dijkstra's_algorithm) and [A*](https://en.wikipedia.org/wiki/A*_search_algorithm) for NodeJS.
 
-This repo is heavily indebted to the great [ngraph.path](https://github.com/anvaka/ngraph.path) library by [@anvaka](https://github.com/anvaka).  After much trial and error, I was unable to match the speed of NGraph on my own.  As a result, a substantial portion of the data model is derived from the ngraph implementation.  If you are looking for a more flexible, general-purpose pathfinding library, you should consider using NGraph instead.
+This repo is heavily indebted to the great [ngraph.path](https://github.com/anvaka/ngraph.path) library, which instructed a good portion of the data model for *geojson-dijkstra*.  Extra thanks to @mourner for creating a blazing fast priority queue.
+
+If you are looking for a more flexible, general-purpose pathfinding library, you should consider using NGraph instead.
 
 ## Quickstart
 
@@ -40,7 +42,7 @@ Each geojson feature's `properties` object must contain an `_id` attribute (as a
 
 Additionally, the following properties can be used to customize:
 
-* `_direction`: 'f' (string) linestring is valid in the forward direction only. default is valid in both directions.
+* `_direction`: a value of `"f"` indicates that the linestring is valid in the forward direction only. default is valid in both directions.
 * `_forward_cost`: (number, overrides _cost) cost in the forward direction
 * `_backward_cost`: (number, overrides _cost) cost in the backward direction
 
@@ -66,13 +68,15 @@ Creates a `finder` object with one property; the `findPath` function.
 
 The `options_object` for `graph.createFinder` includes the following **optional** properties:
 
-`heuristic`:  This activates A* mode, and will dramatically speed up routing.  Without a heuristic function your path will be routed by a standard implementation of Dijkstra algorithm.
+ - `heuristic`:  This activates A* mode, and will dramatically speed up routing.  The function will be supplied with `(fromCoords, toCoords)`, (the current and end node in a graph) in which both of parameters are of type `[lng, lat]`. The heuristic function will return an estimated `_cost` of the travel between the two nodes.
 
-Sending in a heuristic function that has not been properly considered can result in finding suboptimal paths, and a slower running time, so beware!
+Without a heuristic function your path will be routed by a standard implementation of Dijkstra algorithm.
 
-The trick to creating a good heuristic function is to try to guess the `_cost` between the current point and the end point **without overestimating**.
+Defining a heuristic function that has not been properly considered can result in suboptimal paths, so beware!
 
-`outputFns`:  These function determine the answers you will receive from your pathfinding.  
+The trick to creating a good heuristic function is to try to guess the `_cost` between the current node and the end node **without overestimating**.
+
+ - `outputFns`:  These function determine the answers you will receive from your pathfinding.  
 
 You can provide a single function by itself, an array of functions, or nothing at all.
 
@@ -88,12 +92,11 @@ To provide additional outputs, you can add (or create your own) `outputFunctions
 
 Two built-in output functions are:
 
-```buildGeoJsonPath```
+ - **buildGeoJsonPath**
 
 Will append `{ path: (geojson) }` to the response object, where `path` is a GeoJSON linestring of all edges and properties along the shortest path.
 
-
-```buildEdgeIdList```
+ - **buildEdgeIdList**
 
 Will append `{ edge_list: [array, of, ids] }` to the response object, where `edge_list` is an ordered array of edge-ids `[1023, 1024, 1025]`, corresponding to the `_id` property in your input GeoJSON file.
 

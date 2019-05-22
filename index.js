@@ -17,9 +17,9 @@ function Graph(geojson, options) {
     options = {};
   }
   this.adjacency_list = {};
-  this.mutate_inputs = false;
   this.mutate_inputs = Boolean(options.allowMutateInputs);
   this._loadFromGeoJson(geojson);
+  this._createNodePool = createNodePool;
 }
 
 function noOp() {
@@ -160,7 +160,7 @@ Graph.prototype.createFinder = function(options) {
 
   const parseOutputFns = options.parseOutputFns;
   const heuristicFn = options.heuristic || noOp;
-  const pool = createNodePool();
+  const pool = this._createNodePool();
   const adjacency_list = this.adjacency_list;
 
   return {
