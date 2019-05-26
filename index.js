@@ -18,8 +18,11 @@ function Graph(geojson, options) {
   }
   this.adjacency_list = {};
   this.mutate_inputs = Boolean(options.allowMutateInputs);
-  this._loadFromGeoJson(geojson);
   this._createNodePool = createNodePool;
+
+  if (geojson) {
+    this.loadFromGeoJson(geojson);
+  }
 }
 
 function noOp() {
@@ -332,7 +335,7 @@ function buildGeoJsonPath(graph, node_map, start, end) {
 }
 
 
-Graph.prototype._loadFromGeoJson = function(geo) {
+Graph.prototype.loadFromGeoJson = function(geo) {
 
   // turf clone is faster than JSON.parse(JSON.stringify(x))
   // still regretable vs mutating - avoid if possible
@@ -435,8 +438,6 @@ Graph.prototype._cleanseGeoJsonNetwork = function(features) {
   });
 
 };
-
-
 
 function detangle(geo) {
 

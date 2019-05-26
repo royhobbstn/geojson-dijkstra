@@ -1,6 +1,6 @@
 {
   "name": "geojson-dijkstra",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "faster, feature rich dijkstra for real world applications",
   "main": "index.js",
   "scripts": {
@@ -25,10 +25,12 @@
   "homepage": "https://github.com/royhobbstn/geojson-dijkstra#readme",
   "dependencies": {
     "@turf/clone": "6.0.2",
-    "cheap-ruler": "^2.5.1",
     "geokdbush": "1.1.0",
-    "kdbush": "1.0.1",
+    "kdbush": "1.0.1"
+  },
+  "devDependencies": {
+    "cheap-ruler": "2.5.1",
     "ngraph.graph": "0.0.18",
-    "ngraph.path": "^1.1.0"
+    "ngraph.path": "1.1.0"
   }
 }
