@@ -159,9 +159,10 @@ function createNodePool() {
 
 }
 
-Graph.prototype.createFinder = function(options) {
+Graph.prototype.createFinder = function(opts) {
 
-  const parseOutputFns = options.parseOutputFns;
+  const options = opts || {};
+  const parseOutputFns = options.parseOutputFns || [];
   const heuristicFn = options.heuristic || noOp;
   const pool = this._createNodePool();
   const adjacency_list = this.adjacency_list;
